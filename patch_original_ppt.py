@@ -118,7 +118,7 @@ def styled_lines(cell, lines, fallback=None, bullet=False):
         if bullet:
             rpr_match = first_run.xpath('./a:rPr')
             if rpr_match:
-                rpr_match[0].attrib.pop('b', None)
+                rpr_match[0].set('b', '1')
             p_pr_match = template.xpath('./a:pPr')
             if p_pr_match:
                 p_pr_match[0].attrib.pop('spcBfr', None)
@@ -233,7 +233,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         rpr_hdr.set('b', '1')
     else:
         rpr_hdr.attrib.pop('b', None)
-    rpr_hdr.set('sz', '900')
+    rpr_hdr.set('sz', '1000')
     r_hdr.append(rpr_hdr)
     t_hdr = OxmlElement('a:t')
     t_hdr.text = " " if is_spacer else str(header_text)
@@ -282,8 +282,8 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
             rpr_item.tag = '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr'
         else:
             rpr_item = OxmlElement('a:rPr')
-        rpr_item.attrib.pop('b', None)
-        rpr_item.set('sz', '900')
+        rpr_item.set('b', '1')
+        rpr_item.set('sz', '1000')
         r_item.append(rpr_item)
         t_item = OxmlElement('a:t')
         prefix = '\u2022  ' if not is_bulleted_p(tmpl) else ''
@@ -581,8 +581,9 @@ def update_slide2_title_and_commentary(slide, report):
             r = p.add_run()
             r.text = f"{quarter} Credit Risk Metrics"
             r.font.bold = True
-            r.font.size = Pt(12)
+            r.font.size = Pt(20)
             r.font.name = "Arial"
+            p.space_after = Pt(3)
             break
 
     # Level 1 Asset quality summary
@@ -612,6 +613,24 @@ def update_slide2_title_and_commentary(slide, report):
     return True
 
 
+
+def ensure_slide_text_arial(slide):
+    """Ensure all text across the entire slide uses Arial font."""
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            for p in shape.text_frame.paragraphs:
+                p.font.name = "Arial"
+                for r in p.runs:
+                    r.font.name = "Arial"
+        if shape.has_table:
+            for row in shape.table.rows:
+                for cell in row.cells:
+                    if not cell.is_spanned:
+                        for p in cell.text_frame.paragraphs:
+                            p.font.name = "Arial"
+                            for r in p.runs:
+                                r.font.name = "Arial"
+
 def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=None):
     """Populate Slide 2 native tables and update title/commentary matching ideal slide.
 
@@ -635,59 +654,51 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(2.06)  # Moved up to 2.06" so bottom notes (7.01") and logo (7.16") are 100% visible
+    table._graphic_frame.top = Inches(2.2896)  # Table position placed right above below text ("below text ke bilkul sath")
     table._graphic_frame.width = Inches(12.8521)
 
-    # 4. Format detailed table cells with 9.0pt font (compact, readable, executive, clean)
-    font_pt = 9.0
-    for r in range(1, len(table.rows)):
-        for c in (3, 4, 5, 6):
-            if c >= len(table.columns):
-                continue
-            cell = table.cell(r, c)
+    # 4. Format ALL detailed table cells with 10.0pt BOLD Arial font across all rows and columns
+    font_pt = 10.0
+    for r_idx, row in enumerate(table.rows):
+        for c_idx, cell in enumerate(row.cells):
             if cell.is_spanned:
                 continue
-            cell.margin_top = Inches(0.008)
-            cell.margin_bottom = Inches(0.008)
+            cell.margin_top = Inches(0.005)
+            cell.margin_bottom = Inches(0.005)
             cell.margin_left = Inches(0.03)
             cell.margin_right = Inches(0.03)
+
+            # Line spacing tailored to row item density so 10pt bold text fits inside allocated row height
+            if r_idx == 7:
+                ln_spc = Pt(9.5)
+            elif r_idx in (4, 8):
+                ln_spc = Pt(10.5)
+            else:
+                ln_spc = Pt(11.2)
+
             for para in cell.text_frame.paragraphs:
                 para.space_before = Pt(0)
                 para.space_after = Pt(0)
-                para.line_spacing = Pt(10.2)
+                para.line_spacing = ln_spc
+                para.font.name = "Arial"
                 para.font.size = Pt(font_pt)
+                para.font.bold = True
                 for run in para.runs:
+                    run.font.name = "Arial"
                     run.font.size = Pt(font_pt)
+                    run.font.bold = True
 
-    # 5. Content-aware row heights ensuring table never exceeds 4.55"
-    # and bottom edge is safely at ~6.61", preserving >0.38" clearance above footer text (7.01") and logo (7.16")
-    target_total_height = 4.55
-    header_h = 0.38
-    row_heights = [header_h]
-
-    for r_idx in range(1, len(table.rows)):
-        row_lines = 1
-        for col_idx in (3, 4, 5, 6):
-            if col_idx < len(table.columns):
-                c = table.cell(r_idx, col_idx)
-                if not c.is_spanned:
-                    cnt = len([p for p in c.text_frame.paragraphs if p.text.strip()])
-                    if cnt > row_lines:
-                        row_lines = cnt
-        h = max(0.28, 0.12 + row_lines * 0.135)
-        row_heights.append(h)
-
-    allowed_data_h = target_total_height - header_h
-    data_heights = row_heights[1:]
-    total_data_h = sum(data_heights)
-    if total_data_h > allowed_data_h:
-        scale = allowed_data_h / total_data_h
-        row_heights = [header_h] + [h * scale for h in data_heights]
-
+    # 5. Row heights matching Ideal_slide_ppt.pptx:
+    # Row 0: 0.4248", R1-R3: 0.3192", R4: 1.0578", R5: 0.6731", R6: 0.3192", R7: 0.8038", R8: 0.4621"
+    # Total table height = 4.6984", Bottom = 2.2896" + 4.6984" = 6.9880" (right next to below text at 7.0113")
+    row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
     for i, h in enumerate(row_heights):
         if i < len(table.rows):
             table.rows[i].height = Inches(h)
     table._graphic_frame.height = Inches(sum(r.height for r in table.rows) / Inches(1))
+
+    # 6. Ensure ALL text across the entire slide uses Arial font
+    ensure_slide_text_arial(slide)
 
     return {
         'same_slide': True,
