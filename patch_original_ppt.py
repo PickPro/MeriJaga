@@ -87,7 +87,7 @@ def styled_lines(cell, lines, fallback=None, bullet=False):
         default_p.append(p_pr)
         first_run = OxmlElement('a:r')
         rpr = OxmlElement('a:rPr')
-        rpr.set('sz', '800')
+        rpr.set('sz', '1000')
         first_run.append(rpr)
         default_p.append(first_run)
         options = [default_p]
@@ -195,7 +195,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         default_p.append(p_pr)
         first_run = OxmlElement('a:r')
         rpr = OxmlElement('a:rPr')
-        rpr.set('sz', '850')
+        rpr.set('sz', '1000')
         first_run.append(rpr)
         default_p.append(first_run)
         options = [default_p]
@@ -233,7 +233,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         rpr_hdr.set('b', '1')
     else:
         rpr_hdr.attrib.pop('b', None)
-    rpr_hdr.set('sz', '850')
+    rpr_hdr.set('sz', '1000')
     r_hdr.append(rpr_hdr)
     t_hdr = OxmlElement('a:t')
     t_hdr.text = " " if is_spacer else str(header_text)
@@ -247,7 +247,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         p_pr_h[0].attrib.pop('spcAft', None)
     body.append(hdr_tmpl)
 
-    # Bullets underneath (sz=850, preserving Amber/font color)
+    # Bullets underneath (sz=1000, preserving Amber/font color)
     for k, item in enumerate(lines or []):
         tmpl = copy.deepcopy(options[min(k, len(options)-1)])
         for ch in list(tmpl):
@@ -260,7 +260,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         else:
             rpr_item = OxmlElement('a:rPr')
         rpr_item.attrib.pop('b', None)
-        rpr_item.set('sz', '850')
+        rpr_item.set('sz', '1000')
         r_item.append(rpr_item)
         t_item = OxmlElement('a:t')
         prefix = '\u2022  ' if not is_bulleted_p(tmpl) else ''
@@ -546,7 +546,7 @@ def update_slide2_summary_table(slide, report, main_table_shape_id=8):
 
 
 def update_slide2_title_and_commentary(slide, report):
-    """Update Slide 2 Title and Commentary to reflect current reporting quarter with bold 18pt."""
+    """Update Slide 2 Title and Commentary to reflect current reporting quarter with bold 12pt (matching bullet points)."""
     quarter = report.get('quarter', '3Q26')
     tb_shape = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top < Inches(2.0)), None)
     if not tb_shape:
@@ -554,11 +554,11 @@ def update_slide2_title_and_commentary(slide, report):
     tf = tb_shape.text_frame
     for p in tf.paragraphs:
         if 'credit risk metrics' in p.text.lower():
-            p.text = ""  # clear runs to rebuild with explicit bold & 18pt size
+            p.text = ""  # clear runs to rebuild with explicit bold & 12pt size (matching bullet points)
             r = p.add_run()
             r.text = f"{quarter} Credit Risk Metrics"
             r.font.bold = True
-            r.font.size = Pt(18)
+            r.font.size = Pt(12)
             r.font.name = "Arial"
             break
 
@@ -592,13 +592,13 @@ def update_slide2_title_and_commentary(slide, report):
 def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=None):
     """Populate Slide 2 native tables and update title/commentary matching ideal slide.
 
-    1. Updates Slide 2 Title (18pt Bold) and Level 1 commentary (12pt matching Bullets 2, 3, 4).
+    1. Updates Slide 2 Title (12pt Bold matching bullet points) and Level 1 commentary (12pt matching Bullets 2, 3, 4).
     2. Populates existing native top-right summary table with 2Q26 vs 3Q26.
     3. Formats bottom 9x7 detailed table with 8.5pt font (readable, not small),
        exact ideal row heights [0.425, 0.319, 0.319, 0.319, 1.058, 0.673, 0.319, 0.804, 0.462],
        total height 4.70", bottom at 6.988", preserving clear buffer above footer line at 7.05".
     """
-    # 1. Update title (18pt) and commentary (12pt)
+    # 1. Update title (12pt matching bullet points) and commentary (12pt)
     update_slide2_title_and_commentary(slide, report)
 
     # 2. Update existing top-right summary table
@@ -615,8 +615,8 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     table._graphic_frame.top = Inches(2.2896)
     table._graphic_frame.width = Inches(12.8521)
 
-    # 4. Format detailed table cells with 9.0pt font (readable, executive, bold, NOT tiny)
-    font_pt = 9.0
+    # 4. Format detailed table cells with 10.0pt font (matching ideal slide)
+    font_pt = 10.0
     for r in range(1, len(table.rows)):
         for c in (3, 4, 5, 6):
             if c >= len(table.columns):
@@ -631,7 +631,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             for para in cell.text_frame.paragraphs:
                 para.space_before = Pt(0)
                 para.space_after = Pt(0)
-                para.line_spacing = Pt(font_pt * 1.15)
+                para.line_spacing = Pt(font_pt * 1.12)
                 para.font.size = Pt(font_pt)
                 for run in para.runs:
                     run.font.size = Pt(font_pt)
