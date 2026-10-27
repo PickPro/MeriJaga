@@ -604,8 +604,19 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     # 2. Update existing top-right summary table
     summary_shape = update_slide2_summary_table(slide, report, main_table_shape_id=table._graphic_frame.shape_id)
 
-    # 3. Format detailed table cells with 8.5pt font (clean and readable, not tiny)
-    font_pt = 8.5
+    # 3. Enforce exact column widths and geometry matching Ideal_slide_ppt.pptx:
+    # Widths: [1.584, 0.7093, 1.3256, 1.6987, 1.8023, 2.2985, 3.4338], Total = 12.8521"
+    ideal_col_widths = [1.584, 0.7093, 1.3256, 1.6987, 1.8023, 2.2985, 3.4338]
+    for i, w in enumerate(ideal_col_widths):
+        if i < len(table.columns):
+            table.columns[i].width = Inches(w)
+
+    table._graphic_frame.left = Inches(0.2406)
+    table._graphic_frame.top = Inches(2.2896)
+    table._graphic_frame.width = Inches(12.8521)
+
+    # 4. Format detailed table cells with 9.0pt font (readable, executive, bold, NOT tiny)
+    font_pt = 9.0
     for r in range(1, len(table.rows)):
         for c in (3, 4, 5, 6):
             if c >= len(table.columns):
@@ -625,9 +636,9 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                 for run in para.runs:
                     run.font.size = Pt(font_pt)
 
-    # 4. Exact row heights matching Ideal_slide_ppt.pptx:
-    # Row 0: 0.425", R1-R3: 0.319", R4: 1.058", R5: 0.673", R6: 0.319", R7: 0.804", R8: 0.462"
-    # Total table height = 4.698" (4.70"), Bottom = 2.290" + 4.698" = 6.988", safely above footer at 7.05"
+    # 5. Exact row heights matching Ideal_slide_ppt.pptx:
+    # Row 0: 0.4248", R1-R3: 0.3192", R4: 1.0578", R5: 0.6731", R6: 0.3192", R7: 0.8038", R8: 0.4621"
+    # Total table height = 4.6981" (4.70"), Bottom = 2.2896" + 4.6981" = 6.9877", safely above footer at 7.05"
     quarter = report.get('quarter', '3Q26')
     if quarter == '3Q26':
         row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
@@ -637,12 +648,12 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
         header_h = 0.425
         row_heights = [header_h]
         for spec in planned:
-            w4 = table.columns[4].width / Inches(1) if len(table.columns) > 4 else 1.83
-            w5 = table.columns[5].width / Inches(1) if len(table.columns) > 5 else 1.83
-            w6 = table.columns[6].width / Inches(1) if len(table.columns) > 6 else 1.83
-            l4 = estimate_lines(spec.get('yellow_left', []), w4, font_pt=8.5)
-            l5 = estimate_lines(spec.get('yellow_right', []), w5, font_pt=8.5)
-            l6 = estimate_lines(spec.get('red', []), w6, font_pt=8.5)
+            w4 = table.columns[4].width / Inches(1) if len(table.columns) > 4 else 1.80
+            w5 = table.columns[5].width / Inches(1) if len(table.columns) > 5 else 2.30
+            w6 = table.columns[6].width / Inches(1) if len(table.columns) > 6 else 3.43
+            l4 = estimate_lines(spec.get('yellow_left', []), w4, font_pt=9.0)
+            l5 = estimate_lines(spec.get('yellow_right', []), w5, font_pt=9.0)
+            l6 = estimate_lines(spec.get('red', []), w6, font_pt=9.0)
             max_lines = max(1, l4, l5, l6)
             h = max(0.319, 0.20 + max_lines * 0.10)
             row_heights.append(h)
