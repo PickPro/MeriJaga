@@ -40,6 +40,183 @@ def norm(value):
     return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
 
+
+def setup_empty_slide_for_credit_risk(slide, report):
+    """Automatically construct the full native Credit Risk Slide 2 structure from scratch
+    when an empty slide or arbitrary non-template presentation is provided."""
+    quarter = report.get('quarter', '3Q26')
+
+    # 1. Title & Commentary Text Frame (Left=0.2164", Top=0.0108", Width=8.2", Height=2.2")
+    tb_shape = slide.shapes.add_textbox(Inches(0.2164), Inches(0.0108), Inches(8.2), Inches(2.2))
+    tf = tb_shape.text_frame
+    tf.word_wrap = True
+    p0 = tf.paragraphs[0]
+    p0.text = f"{quarter} Credit Risk Metrics"
+    p0.font.bold = True
+    p0.font.size = Pt(20)
+    p0.font.name = "Arial"
+    p0.space_after = Pt(3)
+
+    row0 = report['rows'][0] if report.get('rows') else None
+    if row0:
+        total_breaches = len(row0.get('yellow', [])) + len(row0.get('red', []))
+        l1_status = f"{total_breaches} Exceeds Warning" if total_breaches > 0 else "All Below Risk Appetite Limits"
+    else:
+        l1_status = "1 Exceeds Warning"
+
+    p1 = tf.add_paragraph()
+    p1.space_after = Pt(2)
+    r1 = p1.add_run()
+    r1.text = "• Total KeyCorp Level 1 Asset Quality: "
+    r1.font.bold = True
+    r1.font.size = Pt(12)
+    r1.font.name = "Arial"
+    r2 = p1.add_run()
+    r2.text = l1_status
+    r2.font.bold = False
+    r2.font.size = Pt(12)
+    r2.font.name = "Arial"
+
+    bullets = [
+        ("• LOB Level 2 and 3 Asset Quality: ", "Majority Below Risk Appetite Limits", True),
+        ("    ✓ Stable asset quality with six Limit breaches", "", False),
+        ("• Commercial Industry Level 2 and 3 Concentration: ", "Majority Within Risk Appetite Limits", True),
+        ("    ✓ Portfolio growth and declining CET1 resulted in a stable number of metrics exceeding Warning level", "", False),
+        ("• Commercial Industry Level 2 and 3 Asset Quality: ", "Majority Within Risk Appetite Limits", True),
+        ("    ✓ Stable asset quality with two Limit breach", "", False),
+    ]
+    for b_pre, b_val, is_hdr in bullets:
+        p = tf.add_paragraph()
+        p.space_after = Pt(2)
+        r = p.add_run()
+        r.text = b_pre + b_val
+        r.font.bold = is_hdr
+        r.font.size = Pt(12)
+        r.font.name = "Arial"
+
+    # 2. Main Detailed Table (9x7)
+    t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(2.24), Inches(12.8521), Inches(4.535))
+    table = t_shape.table
+
+    cw = [1.584, 0.7093, 1.3256, 1.6987, 1.8023, 2.2985, 3.4338]
+    for i, w in enumerate(cw):
+        table.columns[i].width = Inches(w)
+    rh = [0.40, 0.29, 0.29, 0.29, 1.0578, 0.6731, 0.29, 0.8038, 0.44]
+    for i, h in enumerate(rh):
+        table.rows[i].height = Inches(h)
+
+    # Headers
+    headers = [
+        "Credit Risk Metrics", "Level", "Measure",
+        "Within\nRisk Appetite", "Exceeds\nRisk Appetite Warning", "",
+        "Breaches\nRisk Appetite Limit"
+    ]
+    for i, h_txt in enumerate(headers):
+        if h_txt:
+            table.cell(0, i).text = h_txt
+
+    dark_navy = RGBColor(38, 48, 64)
+    light_green = RGBColor(214, 237, 203)
+    light_yellow = RGBColor(255, 252, 204)
+    light_red = RGBColor(255, 199, 206)
+
+    for c in range(3):
+        table.cell(0, c).fill.solid()
+        table.cell(0, c).fill.fore_color.rgb = dark_navy
+        for p in table.cell(0, c).text_frame.paragraphs:
+            p.font.color.rgb = RGBColor(255, 255, 255)
+
+    table.cell(0, 3).fill.solid()
+    table.cell(0, 3).fill.fore_color.rgb = light_green
+    table.cell(0, 4).fill.solid()
+    table.cell(0, 4).fill.fore_color.rgb = light_yellow
+    table.cell(0, 5).fill.solid()
+    table.cell(0, 5).fill.fore_color.rgb = light_yellow
+    table.cell(0, 6).fill.solid()
+    table.cell(0, 6).fill.fore_color.rgb = light_red
+
+    # Merge Col 4 & Col 5 on Header
+    table.cell(0, 4).merge(table.cell(0, 5))
+
+    # Row 1-8 Labels
+    row_data = [
+        ("Total KeyCorp", "1", "Asset Quality"),
+        ("Total KeyCorp", "1", "Concentration"),
+        ("Line Of Business", "2", "Asset Quality"),
+        ("Line Of Business", "3", "Asset Quality"),
+        ("Commercial Industry", "2", "Concentration"),
+        ("Commercial Industry", "3", "Concentration"),
+        ("Commercial Industry", "2", "Asset Quality"),
+        ("Commercial Industry", "3", "Asset Quality")
+    ]
+    for r_i, (cat, lvl, meas) in enumerate(row_data, start=1):
+        table.cell(r_i, 0).text = cat
+        table.cell(r_i, 1).text = lvl
+        table.cell(r_i, 2).text = meas
+        if r_i != 5:
+            table.cell(r_i, 4).merge(table.cell(r_i, 5))
+
+    # 3. Footer Elements (if not present)
+    has_footer = any(s.has_text_frame and 'classification: confidential' in s.text_frame.text.lower() for s in slide.shapes)
+    if not has_footer:
+        tb_f = slide.shapes.add_textbox(Inches(2.03), Inches(7.01), Inches(9.5), Inches(0.38))
+        tff = tb_f.text_frame
+        pf0 = tff.paragraphs[0]
+        pf0.text = "Supporting information on metrics exceeding Risk Appetite Warning and in breach Risk Appetite Limit at the end of the deck"
+        pf0.font.name = "Arial"
+        pf0.font.size = Pt(8.0)
+        pf0.font.bold = True
+        pf1 = tff.add_paragraph()
+        pf1.text = "Note: Comparisons above reflect current ERM and Credit risk metric framework. For prior period breaches refer to historic Credit Risk Metric reports"
+        pf1.font.name = "Arial"
+        pf1.font.size = Pt(8.0)
+        pf1.font.bold = True
+
+    return t_shape
+
+
+def find_main_table_and_slide(prs):
+    """Dynamically locate the credit-risk detailed table across all slides.
+    Checks Slide 2 first (corporate standard), then checks all other slides."""
+    # 1. Standard: Check Slide 2 for 9x7 table
+    if len(prs.slides) > 1:
+        tables = [s for s in prs.slides[1].shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
+        if tables:
+            return prs.slides[1], tables[0], 2
+
+    # 2. Check any slide for 9x7 table
+    for idx, slide in enumerate(prs.slides, start=1):
+        tables = [s for s in slide.shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
+        if tables:
+            return slide, tables[0], idx
+
+    # 3. Check Slide 2 for any table with >= 6 rows
+    if len(prs.slides) > 1:
+        tables = [s for s in prs.slides[1].shapes if s.has_table and len(s.table.rows) >= 6]
+        if tables:
+            tables.sort(key=lambda s: len(s.table.rows), reverse=True)
+            return prs.slides[1], tables[0], 2
+
+    # 4. Check any slide for any table with >= 6 rows
+    candidates = []
+    for idx, slide in enumerate(prs.slides, start=1):
+        for s in slide.shapes:
+            if s.has_table and len(s.table.rows) >= 6:
+                candidates.append((len(s.table.rows), slide, s, idx))
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1], candidates[0][2], candidates[0][3]
+
+    # Detailed diagnostic if no table is found
+    slide_summary = []
+    for idx, s in enumerate(prs.slides, start=1):
+        t_count = len([sh for sh in s.shapes if sh.has_table])
+        slide_summary.append(f"Slide {idx} (shapes={len(s.shapes)}, tables={t_count})")
+    summary_str = "; ".join(slide_summary)
+    raise ValueError(f"No detailed credit risk table found in presentation ({summary_str}). "
+                     "Please ensure the template slide has the 9x7 detailed table pasted into it.")
+
+
 def pick_main_table(slide, shape_id=None, verify_geometry=False):
     """Dynamically find the main 9x7 detailed table on Slide 2 regardless of shape ID.
     Supports original template PPTX as well as user's new custom deck slides seamlessly."""
@@ -726,9 +903,38 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
         raise ValueError('Cannot combine --same-slide with --new-table-slide')
 
     prs = Presentation(str(source))
-    if len(prs.slides) < 2:
-        raise ValueError('Original PowerPoint has fewer than 2 slides')
-    shape = pick_main_table(prs.slides[1]); table = shape.table
+    if len(prs.slides) == 1:
+        target_slide = prs.slides[0]
+        slide_num = 1
+    elif len(prs.slides) >= 2:
+        target_slide = prs.slides[1]
+        slide_num = 2
+    else:
+        target_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        slide_num = 1
+
+    # Check if target_slide has the 9x7 detailed table
+    tables = [s for s in target_slide.shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
+    if not tables:
+        found_anywhere = False
+        for idx_s, s in enumerate(prs.slides, start=1):
+            t_cand = [sh for sh in s.shapes if sh.has_table and len(sh.table.rows) == 9 and len(sh.table.columns) == 7]
+            if t_cand:
+                target_slide = s
+                tables = t_cand
+                slide_num = idx_s
+                found_anywhere = True
+                break
+        if not found_anywhere:
+            # Slide is empty or non-template! Construct the full native Credit Risk Slide 2 on target_slide!
+            shape = setup_empty_slide_for_credit_risk(target_slide, report)
+            table = shape.table
+        else:
+            shape = tables[0]
+            table = shape.table
+    else:
+        shape = tables[0]
+        table = shape.table
     warnings = []
     planned = []
 
@@ -794,14 +1000,14 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
             styled_lines(table.cell(r, 6), spec['red'], red_sample, bullet=True)
 
     if same_slide:
-        fit_info = apply_same_slide_layout(prs.slides[1], table, planned, report, count_reference_pptx)
+        fit_info = apply_same_slide_layout(target_slide, table, planned, report, count_reference_pptx)
         warnings = []
     elif new_table_slide:
         newslide, moved_table = add_dedicated_slide(prs, shape, report['quarter'], report.get('draft', False),
                                                     report.get('totals', {}).get('pending', 0))
         fit_info = dedicated_layout(prs, moved_table.table, planned, report['quarter'])
         if include_count_slide:
-            label_historical_slide(prs.slides[1])
+            label_historical_slide(target_slide)
             add_count_slide(prs, report)
         warnings = []
     else:
