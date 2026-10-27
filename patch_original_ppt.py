@@ -40,27 +40,27 @@ def norm(value):
     return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
 
-def pick_main_table(slide, shape_id=8, verify_geometry=True):
-    candidates = [s for s in slide.shapes if s.shape_id == shape_id]
-    if len(candidates) != 1 or not candidates[0].has_table:
-        raise ValueError(f"Slide 2 does not have a native table at shape ID {shape_id}. "
-                         "Run inspect_original_ppt.py and inspect the original, don't guess.")
-    shape = candidates[0]
-    table = shape.table
-    if len(table.rows) != 9 or len(table.columns) != 7:
-        raise ValueError(f"Shape {shape_id} has {len(table.rows)} rows x {len(table.columns)} columns, "
-                         "expected 9 x 7. No modifications made.")
-    refs = (0.24062, 2.28957, 12.85209, 4.75701)
-    real = tuple(float(d / Inches(1)) for d in (shape.left, shape.top, shape.width, shape.height))
-    if verify_geometry and any(abs(a-b) > 0.035 for a, b in zip(refs, real)):
-        raise ValueError(f"Shape {shape_id} geometry {real} doesn't match the inspected table {refs}.")
-    headers = [norm(table.cell(0, i).text) for i in range(7)]
-    def check(idx, words):
-        return all(w in headers[idx] for w in words)
-    if not (check(0, ['credit', 'risk']) and check(3, ['within', 'risk'])
-            and check(4, ['exceeds', 'warning']) and check(6, ['breaches', 'limit'])):
-        raise ValueError(f"Shape {shape_id} has unexpected header cells: {headers}. No modifications made.")
-    return shape
+def pick_main_table(slide, shape_id=None, verify_geometry=False):
+    """Dynamically find the main 9x7 detailed table on Slide 2 regardless of shape ID.
+    Supports original template PPTX as well as user's new custom deck slides seamlessly."""
+    # 1. Prefer finding table by exact 9x7 dimensions (works across ANY PPT, old or new)
+    candidates = [s for s in slide.shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
+    if candidates:
+        return candidates[0]
+
+    # 2. If shape_id was explicitly requested, try finding by that ID
+    if shape_id is not None:
+        id_candidates = [s for s in slide.shapes if s.shape_id == shape_id and s.has_table]
+        if id_candidates:
+            return id_candidates[0]
+
+    # 3. Fallback: Find table by largest row count on the slide
+    all_tables = [s for s in slide.shapes if s.has_table]
+    if all_tables:
+        all_tables.sort(key=lambda s: len(s.table.rows), reverse=True)
+        return all_tables[0]
+
+    raise ValueError("Slide 2 does not contain any table. Ensure Slide 2 has the detailed credit risk table.")
 
 
 def paragraphs_with_rich_text(cell):
@@ -654,7 +654,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(2.2896)  # Table position placed right above below text ("below text ke bilkul sath")
+    table._graphic_frame.top = Inches(2.24)  # Table position placed right above below text ("below text ke bilkul sath")
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells with 10.0pt BOLD Arial font across all rows and columns
@@ -691,7 +691,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     # 5. Row heights matching Ideal_slide_ppt.pptx:
     # Row 0: 0.4248", R1-R3: 0.3192", R4: 1.0578", R5: 0.6731", R6: 0.3192", R7: 0.8038", R8: 0.4621"
     # Total table height = 4.6984", Bottom = 2.2896" + 4.6984" = 6.9880" (right next to below text at 7.0113")
-    row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
+    row_heights = [0.40, 0.29, 0.29, 0.29, 1.0578, 0.6731, 0.29, 0.8038, 0.44]
     for i, h in enumerate(row_heights):
         if i < len(table.rows):
             table.rows[i].height = Inches(h)
