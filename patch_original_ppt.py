@@ -43,8 +43,15 @@ def norm(value):
 
 def setup_empty_slide_for_credit_risk(slide, report):
     """Automatically construct the full native Credit Risk Slide 2 structure from scratch
-    when an empty slide or arbitrary non-template presentation is provided."""
+    when an empty slide or arbitrary non-template presentation is provided.
+    Constructs:
+      1. Title & Commentary Text Frame (Upper Left)
+      2. Top-Right Summary Counts Table (6 rows x 8 cols)
+      3. Main Detailed Table (9 rows x 7 cols) with executive colors and clean fills
+      4. Footer Notes Text Box
+    """
     quarter = report.get('quarter', '3Q26')
+    prior_quarter = get_prior_quarter(quarter)
 
     # 1. Title & Commentary Text Frame (Left=0.2164", Top=0.0108", Width=8.2", Height=2.2")
     tb_shape = slide.shapes.add_textbox(Inches(0.2164), Inches(0.0108), Inches(8.2), Inches(2.2))
@@ -94,9 +101,105 @@ def setup_empty_slide_for_credit_risk(slide, report):
         r.font.size = Pt(12)
         r.font.name = "Arial"
 
-    # 2. Main Detailed Table (9x7)
+    dark_navy = RGBColor(38, 48, 64)
+    light_green = RGBColor(204, 255, 204)  # #CCFFCC from template inspection
+    light_yellow = RGBColor(255, 255, 153) # #FFFF99 from template inspection
+    light_red = RGBColor(255, 124, 128)    # #FF7C80 from template inspection
+    white = RGBColor(255, 255, 255)
+
+    # 2. Top-Right Summary Counts Table (6 rows x 8 cols)
+    # Exact geometry from template inspection: Left=8.6167", Top=0.3273", Width=4.6", Height=1.6833"
+    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.3273), Inches(4.6), Inches(1.6833))
+    s_tbl = summary_shape.table
+    try:
+        s_tbl._tbl.tblPr.set('bandRow', '0')
+        s_tbl._tbl.tblPr.set('firstRow', '0')
+    except Exception:
+        pass
+
+    s_col_widths = [0.6, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0]
+    for i, w in enumerate(s_col_widths):
+        s_tbl.columns[i].width = Inches(w)
+    s_row_heights = [0.25, 0.25, 0.2, 0.2, 0.2, 0.1382]
+    for i, h in enumerate(s_row_heights):
+        s_tbl.rows[i].height = Inches(h)
+
+    # Merges on Summary Table (5 merges from template inspection)
+    s_tbl.cell(0, 0).merge(s_tbl.cell(1, 0))
+    s_tbl.cell(0, 1).merge(s_tbl.cell(0, 2))
+    s_tbl.cell(0, 3).merge(s_tbl.cell(0, 4))
+    s_tbl.cell(0, 5).merge(s_tbl.cell(0, 6))
+    s_tbl.cell(0, 7).merge(s_tbl.cell(1, 7))
+
+    # Header Text on Summary Table
+    s_tbl.cell(0, 1).text = "Within Risk Appetite"
+    s_tbl.cell(0, 3).text = "Exceeds Risk Appetite Warning"
+    s_tbl.cell(0, 5).text = "Breaches Risk Appetite Limit"
+    s_tbl.cell(0, 7).text = "Total"
+
+    s_tbl.cell(1, 1).text = prior_quarter
+    s_tbl.cell(1, 2).text = quarter
+    s_tbl.cell(1, 3).text = prior_quarter
+    s_tbl.cell(1, 4).text = quarter
+    s_tbl.cell(1, 5).text = prior_quarter
+    s_tbl.cell(1, 6).text = quarter
+
+    # Row labels on Summary Table
+    s_tbl.cell(2, 0).text = "Level 1"
+    s_tbl.cell(3, 0).text = "Level 2"
+    s_tbl.cell(4, 0).text = "Level 3"
+    s_tbl.cell(5, 0).text = "Total"
+
+    # Format all cells of Summary Table with clean fills & font styling
+    for r_i, r in enumerate(s_tbl.rows):
+        for c_i, cell in enumerate(r.cells):
+            if cell.is_spanned:
+                continue
+            cell.margin_top = Inches(0.01)
+            cell.margin_bottom = Inches(0.01)
+            cell.margin_left = Inches(0.02)
+            cell.margin_right = Inches(0.02)
+            cell.fill.solid()
+
+            # Background colors
+            if r_i in (0, 1):
+                if c_i in (1, 2):
+                    cell.fill.fore_color.rgb = light_green
+                elif c_i in (3, 4):
+                    cell.fill.fore_color.rgb = light_yellow
+                elif c_i in (5, 6):
+                    cell.fill.fore_color.rgb = light_red
+                elif c_i == 7:
+                    cell.fill.fore_color.rgb = dark_navy
+                else:
+                    cell.fill.fore_color.rgb = white
+            else:
+                cell.fill.fore_color.rgb = white
+
+            # Font styling
+            is_hdr_cell = (r_i in (0, 1)) or (r_i == 5) or (c_i in (0, 7))
+            txt_clr = white if (r_i in (0, 1) and c_i == 7) else dark_navy
+            for p in cell.text_frame.paragraphs:
+                p.alignment = PP_ALIGN.CENTER if c_i > 0 else PP_ALIGN.LEFT
+                p.font.name = "Arial"
+                p.font.size = Pt(8.5)
+                p.font.bold = is_hdr_cell
+                p.font.color.rgb = txt_clr
+                for run in p.runs:
+                    run.font.name = "Arial"
+                    run.font.size = Pt(8.5)
+                    run.font.bold = is_hdr_cell
+                    run.font.color.rgb = txt_clr
+
+    # 3. Main Detailed Table (9x7)
+    # Exact geometry from template inspection: Left=0.2406", Top=2.24", Width=12.8521", Height=4.535"
     t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(2.24), Inches(12.8521), Inches(4.535))
     table = t_shape.table
+    try:
+        table._tbl.tblPr.set('bandRow', '0')
+        table._tbl.tblPr.set('firstRow', '0')
+    except Exception:
+        pass
 
     cw = [1.584, 0.7093, 1.3256, 1.6987, 1.8023, 2.2985, 3.4338]
     for i, w in enumerate(cw):
@@ -115,51 +218,84 @@ def setup_empty_slide_for_credit_risk(slide, report):
         if h_txt:
             table.cell(0, i).text = h_txt
 
-    dark_navy = RGBColor(38, 48, 64)
-    light_green = RGBColor(214, 237, 203)
-    light_yellow = RGBColor(255, 252, 204)
-    light_red = RGBColor(255, 199, 206)
-
     for c in range(3):
         table.cell(0, c).fill.solid()
         table.cell(0, c).fill.fore_color.rgb = dark_navy
         for p in table.cell(0, c).text_frame.paragraphs:
-            p.font.color.rgb = RGBColor(255, 255, 255)
+            p.font.name = "Arial"
+            p.font.size = Pt(10.0)
+            p.font.bold = True
+            p.font.color.rgb = white
 
     table.cell(0, 3).fill.solid()
     table.cell(0, 3).fill.fore_color.rgb = light_green
+    for p in table.cell(0, 3).text_frame.paragraphs:
+        p.font.name = "Arial"
+        p.font.size = Pt(10.0)
+        p.font.bold = True
+        p.font.color.rgb = dark_navy
+
     table.cell(0, 4).fill.solid()
     table.cell(0, 4).fill.fore_color.rgb = light_yellow
+    for p in table.cell(0, 4).text_frame.paragraphs:
+        p.font.name = "Arial"
+        p.font.size = Pt(10.0)
+        p.font.bold = True
+        p.font.color.rgb = dark_navy
+
     table.cell(0, 5).fill.solid()
     table.cell(0, 5).fill.fore_color.rgb = light_yellow
+
     table.cell(0, 6).fill.solid()
     table.cell(0, 6).fill.fore_color.rgb = light_red
+    for p in table.cell(0, 6).text_frame.paragraphs:
+        p.font.name = "Arial"
+        p.font.size = Pt(10.0)
+        p.font.bold = True
+        p.font.color.rgb = dark_navy
 
     # Merge Col 4 & Col 5 on Header
     table.cell(0, 4).merge(table.cell(0, 5))
 
-    # Row 1-8 Labels
+    # Row 1-8 Merges and Labels from template inspection:
+    # R1C0 -> R2C0 ("Total KeyCorp")
+    # R3C0 -> R4C0 ("Line Of Business")
+    # R5C0 -> R8C0 ("Commercial Industry")
     row_data = [
         ("Total KeyCorp", "1", "Asset Quality"),
-        ("Total KeyCorp", "1", "Concentration"),
+        ("", "1", "Concentration"),
         ("Line Of Business", "2", "Asset Quality"),
-        ("Line Of Business", "3", "Asset Quality"),
+        ("", "3", "Asset Quality"),
         ("Commercial Industry", "2", "Concentration"),
-        ("Commercial Industry", "3", "Concentration"),
-        ("Commercial Industry", "2", "Asset Quality"),
-        ("Commercial Industry", "3", "Asset Quality")
+        ("", "3", "Concentration"),
+        ("", "2", "Asset Quality"),
+        ("", "3", "Asset Quality")
     ]
     for r_i, (cat, lvl, meas) in enumerate(row_data, start=1):
-        table.cell(r_i, 0).text = cat
+        if cat:
+            table.cell(r_i, 0).text = cat
         table.cell(r_i, 1).text = lvl
         table.cell(r_i, 2).text = meas
         if r_i != 5:
             table.cell(r_i, 4).merge(table.cell(r_i, 5))
 
-    # 3. Footer Elements (if not present)
+    # Category merges
+    table.cell(1, 0).merge(table.cell(2, 0))
+    table.cell(3, 0).merge(table.cell(4, 0))
+    table.cell(5, 0).merge(table.cell(8, 0))
+
+    # Ensure all data cells have explicit clean white fill to eliminate theme shading
+    for r_i in range(1, 9):
+        for c_i in range(7):
+            cell = table.cell(r_i, c_i)
+            if not cell.is_spanned:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = white
+
+    # 4. Footer Elements (if not present)
     has_footer = any(s.has_text_frame and 'classification: confidential' in s.text_frame.text.lower() for s in slide.shapes)
     if not has_footer:
-        tb_f = slide.shapes.add_textbox(Inches(2.03), Inches(7.01), Inches(9.5), Inches(0.38))
+        tb_f = slide.shapes.add_textbox(Inches(2.0319), Inches(7.0113), Inches(9.5), Inches(0.38))
         tff = tb_f.text_frame
         pf0 = tff.paragraphs[0]
         pf0.text = "Supporting information on metrics exceeding Risk Appetite Warning and in breach Risk Appetite Limit at the end of the deck"
@@ -779,7 +915,7 @@ def update_slide2_title_and_commentary(slide, report):
             if 'Total KeyCorp Level 1 Asset Quality' in p.text:
                 p.text = ""
                 r1 = p.add_run()
-                r1.text = "Total KeyCorp Level 1 Asset Quality: "
+                r1.text = "• Total KeyCorp Level 1 Asset Quality: "
                 r1.font.bold = True
                 r1.font.size = Pt(12)
                 r2 = p.add_run()
