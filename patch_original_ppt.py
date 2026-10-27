@@ -233,7 +233,7 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
         rpr_hdr.set('b', '1')
     else:
         rpr_hdr.attrib.pop('b', None)
-    rpr_hdr.set('sz', '1000')
+    rpr_hdr.set('sz', '900')
     r_hdr.append(rpr_hdr)
     t_hdr = OxmlElement('a:t')
     t_hdr.text = " " if is_spacer else str(header_text)
@@ -245,22 +245,45 @@ def styled_lines_with_header(cell, header_text, lines, fallback=None):
     if p_pr_h:
         p_pr_h[0].attrib.pop('spcBfr', None)
         p_pr_h[0].attrib.pop('spcAft', None)
+        for b_child in list(p_pr_h[0]):
+            if b_child.tag.endswith(('buChar', 'buAutoNum', 'buBlip', 'buClr', 'buSzPct', 'buSzPts', 'buFont')):
+                p_pr_h[0].remove(b_child)
     body.append(hdr_tmpl)
 
-    # Bullets underneath (sz=1000, preserving Amber/font color)
+    # Bullets underneath: ALL items (Finance, Consumer Services, etc.) use bullet template & sample rpr
+    # from fallback (pure yellow/amber bullet) or options[1:], so formatting is 100% identical
+    bullet_options = []
+    if fallback is not None:
+        bullet_options = paragraphs_with_rich_text(fallback)
+    if not bullet_options and len(options) > 1:
+        bullet_options = options[1:]
+    if not bullet_options:
+        bullet_options = options
+
+    bullet_sample_rpr = None
+    b_first_run = bullet_options[0].xpath('./a:r')
+    if b_first_run:
+        b_rpr = b_first_run[0].xpath('./a:rPr')
+        if b_rpr:
+            bullet_sample_rpr = b_rpr[0]
+    if bullet_sample_rpr is None:
+        b_end_rpr = bullet_options[0].xpath('./a:endParaRPr')
+        if b_end_rpr:
+            bullet_sample_rpr = b_end_rpr[0]
+
     for k, item in enumerate(lines or []):
-        tmpl = copy.deepcopy(options[min(k, len(options)-1)])
+        tmpl = copy.deepcopy(bullet_options[min(k, len(bullet_options)-1)])
         for ch in list(tmpl):
             if ch.tag.endswith(('}r', '}br', '}fld')):
                 tmpl.remove(ch)
         r_item = OxmlElement('a:r')
-        if sample_rpr is not None:
-            rpr_item = copy.deepcopy(sample_rpr)
+        if bullet_sample_rpr is not None:
+            rpr_item = copy.deepcopy(bullet_sample_rpr)
             rpr_item.tag = '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr'
         else:
             rpr_item = OxmlElement('a:rPr')
         rpr_item.attrib.pop('b', None)
-        rpr_item.set('sz', '1000')
+        rpr_item.set('sz', '900')
         r_item.append(rpr_item)
         t_item = OxmlElement('a:t')
         prefix = '\u2022  ' if not is_bulleted_p(tmpl) else ''
@@ -578,7 +601,7 @@ def update_slide2_title_and_commentary(slide, report):
             if 'Total KeyCorp Level 1 Asset Quality' in p.text:
                 p.text = ""
                 r1 = p.add_run()
-                r1.text = "\u2022 Total KeyCorp Level 1 Asset Quality: "
+                r1.text = "Total KeyCorp Level 1 Asset Quality: "
                 r1.font.bold = True
                 r1.font.size = Pt(12)
                 r2 = p.add_run()
@@ -612,11 +635,11 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(2.2896)
+    table._graphic_frame.top = Inches(2.06)  # Moved up to 2.06" so bottom notes (7.01") and logo (7.16") are 100% visible
     table._graphic_frame.width = Inches(12.8521)
 
-    # 4. Format detailed table cells with 10.0pt font (matching ideal slide)
-    font_pt = 10.0
+    # 4. Format detailed table cells with 9.0pt font (compact, readable, executive, clean)
+    font_pt = 9.0
     for r in range(1, len(table.rows)):
         for c in (3, 4, 5, 6):
             if c >= len(table.columns):
@@ -624,45 +647,42 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             cell = table.cell(r, c)
             if cell.is_spanned:
                 continue
-            cell.margin_top = Inches(0.01)
-            cell.margin_bottom = Inches(0.01)
+            cell.margin_top = Inches(0.008)
+            cell.margin_bottom = Inches(0.008)
             cell.margin_left = Inches(0.03)
             cell.margin_right = Inches(0.03)
             for para in cell.text_frame.paragraphs:
                 para.space_before = Pt(0)
                 para.space_after = Pt(0)
-                para.line_spacing = Pt(font_pt * 1.12)
+                para.line_spacing = Pt(10.2)
                 para.font.size = Pt(font_pt)
                 for run in para.runs:
                     run.font.size = Pt(font_pt)
 
-    # 5. Exact row heights matching Ideal_slide_ppt.pptx:
-    # Row 0: 0.4248", R1-R3: 0.3192", R4: 1.0578", R5: 0.6731", R6: 0.3192", R7: 0.8038", R8: 0.4621"
-    # Total table height = 4.6981" (4.70"), Bottom = 2.2896" + 4.6981" = 6.9877", safely above footer at 7.05"
-    quarter = report.get('quarter', '3Q26')
-    if quarter == '3Q26':
-        row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
-    else:
-        # Generic content-weighted scaling for other quarters
-        target_total_height = 4.70
-        header_h = 0.425
-        row_heights = [header_h]
-        for spec in planned:
-            w4 = table.columns[4].width / Inches(1) if len(table.columns) > 4 else 1.80
-            w5 = table.columns[5].width / Inches(1) if len(table.columns) > 5 else 2.30
-            w6 = table.columns[6].width / Inches(1) if len(table.columns) > 6 else 3.43
-            l4 = estimate_lines(spec.get('yellow_left', []), w4, font_pt=9.0)
-            l5 = estimate_lines(spec.get('yellow_right', []), w5, font_pt=9.0)
-            l6 = estimate_lines(spec.get('red', []), w6, font_pt=9.0)
-            max_lines = max(1, l4, l5, l6)
-            h = max(0.319, 0.20 + max_lines * 0.10)
-            row_heights.append(h)
-        allowed_data_h = target_total_height - header_h
-        data_heights = row_heights[1:]
-        total_data_h = sum(data_heights)
-        if total_data_h > allowed_data_h:
-            scale = allowed_data_h / total_data_h
-            row_heights = [header_h] + [h * scale for h in data_heights]
+    # 5. Content-aware row heights ensuring table never exceeds 4.55"
+    # and bottom edge is safely at ~6.61", preserving >0.38" clearance above footer text (7.01") and logo (7.16")
+    target_total_height = 4.55
+    header_h = 0.38
+    row_heights = [header_h]
+
+    for r_idx in range(1, len(table.rows)):
+        row_lines = 1
+        for col_idx in (3, 4, 5, 6):
+            if col_idx < len(table.columns):
+                c = table.cell(r_idx, col_idx)
+                if not c.is_spanned:
+                    cnt = len([p for p in c.text_frame.paragraphs if p.text.strip()])
+                    if cnt > row_lines:
+                        row_lines = cnt
+        h = max(0.28, 0.12 + row_lines * 0.135)
+        row_heights.append(h)
+
+    allowed_data_h = target_total_height - header_h
+    data_heights = row_heights[1:]
+    total_data_h = sum(data_heights)
+    if total_data_h > allowed_data_h:
+        scale = allowed_data_h / total_data_h
+        row_heights = [header_h] + [h * scale for h in data_heights]
 
     for i, h in enumerate(row_heights):
         if i < len(table.rows):
@@ -673,6 +693,8 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
         'same_slide': True,
         'summary_table_updated': summary_shape is not None,
         'table_height_in': round(table._graphic_frame.height / Inches(1), 3),
+        'table_top_in': round(table._graphic_frame.top / Inches(1), 3),
+        'table_bottom_in': round((table._graphic_frame.top + table._graphic_frame.height) / Inches(1), 3),
         'extra_tables_created': 0
     }
 
