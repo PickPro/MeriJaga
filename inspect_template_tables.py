@@ -35,8 +35,31 @@ except ImportError:
     sys.exit(1)
 
 
+NSMAP = {
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+    'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+}
+
+
+def safe_xpath(element, query):
+    """Safely execute an XPath query with standard OpenXML namespaces."""
+    if element is None:
+        return []
+    try:
+        return element.xpath(query, namespaces=NSMAP)
+    except Exception:
+        try:
+            return element.xpath(query)
+        except Exception:
+            return []
+
+
 def emu_to_in(emu):
-    return round(float(emu) / 914400.0, 4) if emu is not None else 0.0
+    try:
+        return round(float(emu) / 914400.0, 4) if emu is not None else 0.0
+    except Exception:
+        return 0.0
 
 
 def pt_to_float(pt_val):
@@ -70,19 +93,18 @@ def get_color_dict(color_obj, xml_element=None):
             pass
 
     if xml_element is not None:
-        # Check XML for direct srgbClr or schemeClr
-        srgb = xml_element.xpath('.//a:srgbClr/@val')
+        srgb = safe_xpath(xml_element, './/a:srgbClr/@val')
         if srgb:
-            hex_str = srgb[0].upper()
+            hex_str = str(srgb[0]).upper()
             try:
                 r, g, b = int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
                 return {'type': 'rgb', 'hex': f"#{hex_str}", 'rgb': [r, g, b]}
             except Exception:
                 return {'type': 'rgb', 'hex': f"#{hex_str}", 'rgb': None}
-        sch = xml_element.xpath('.//a:schemeClr/@val')
+        sch = safe_xpath(xml_element, './/a:schemeClr/@val')
         if sch:
-            return {'type': 'theme', 'scheme': sch[0], 'hex': None}
-        if xml_element.xpath('.//a:noFill'):
+            return {'type': 'theme', 'scheme': str(sch[0]), 'hex': None}
+        if safe_xpath(xml_element, './/a:noFill'):
             return {'type': 'noFill', 'hex': None}
 
     return result
@@ -90,57 +112,63 @@ def get_color_dict(color_obj, xml_element=None):
 
 def extract_cell_fill(cell):
     """Extract fill details from a cell."""
-    tc = cell._tc
-    tcPr = tc.xpath('./a:tcPr')
-    if not tcPr:
-        return {'type': 'none', 'hex': None}
-    
-    tcPr_el = tcPr[0]
-    solid_fill = tcPr_el.xpath('./a:solidFill')
-    if solid_fill:
-        srgb = solid_fill[0].xpath('.//a:srgbClr/@val')
-        if srgb:
-            hex_str = srgb[0].upper()
-            try:
-                r, g, b = int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
-                return {'type': 'solid', 'hex': f"#{hex_str}", 'rgb': [r, g, b]}
-            except Exception:
-                return {'type': 'solid', 'hex': f"#{hex_str}"}
-        sch = solid_fill[0].xpath('.//a:schemeClr/@val')
-        if sch:
-            return {'type': 'theme', 'scheme': sch[0]}
-    
-    if tcPr_el.xpath('./a:noFill'):
-        return {'type': 'noFill'}
-    
-    return {'type': 'theme_default'}
+    try:
+        tc = cell._tc
+        tcPr = safe_xpath(tc, './a:tcPr')
+        if not tcPr:
+            return {'type': 'none', 'hex': None}
+        
+        tcPr_el = tcPr[0]
+        solid_fill = safe_xpath(tcPr_el, './a:solidFill')
+        if solid_fill:
+            srgb = safe_xpath(solid_fill[0], './/a:srgbClr/@val')
+            if srgb:
+                hex_str = str(srgb[0]).upper()
+                try:
+                    r, g, b = int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
+                    return {'type': 'solid', 'hex': f"#{hex_str}", 'rgb': [r, g, b]}
+                except Exception:
+                    return {'type': 'solid', 'hex': f"#{hex_str}"}
+            sch = safe_xpath(solid_fill[0], './/a:schemeClr/@val')
+            if sch:
+                return {'type': 'theme', 'scheme': str(sch[0])}
+        
+        if safe_xpath(tcPr_el, './a:noFill'):
+            return {'type': 'noFill'}
+        
+        return {'type': 'theme_default'}
+    except Exception:
+        return {'type': 'unknown', 'hex': None}
 
 
 def extract_borders(cell):
     """Extract border formatting from cell tcPr."""
     borders = {}
-    tcPr = cell._tc.xpath('./a:tcPr')
-    if not tcPr:
-        return borders
-    tcPr_el = tcPr[0]
-    for side in ['lnL', 'lnR', 'lnT', 'lnB']:
-        ln = tcPr_el.xpath(f'./a:{side}')
-        if ln:
-            w_emu = ln[0].attrib.get('w')
-            w_pt = round(float(w_emu) / 12700.0, 2) if w_emu else None
-            clr = ln[0].xpath('.//a:srgbClr/@val')
-            hex_clr = f"#{clr[0].upper()}" if clr else None
-            borders[side] = {'width_pt': w_pt, 'color': hex_clr}
-        else:
-            borders[side] = None
+    try:
+        tcPr = safe_xpath(cell._tc, './a:tcPr')
+        if not tcPr:
+            return borders
+        tcPr_el = tcPr[0]
+        for side in ['lnL', 'lnR', 'lnT', 'lnB']:
+            ln = safe_xpath(tcPr_el, f'./a:{side}')
+            if ln:
+                w_emu = ln[0].attrib.get('w')
+                w_pt = round(float(w_emu) / 12700.0, 2) if w_emu else None
+                clr = safe_xpath(ln[0], './/a:srgbClr/@val')
+                hex_clr = f"#{str(clr[0]).upper()}" if clr else None
+                borders[side] = {'width_pt': w_pt, 'color': hex_clr}
+            else:
+                borders[side] = None
+    except Exception:
+        pass
     return borders
 
 
 def analyze_table_shape(shape):
     """Deep analysis of a PowerPoint Table shape."""
     tbl = shape.table
-    tbl_el = shape._element.xpath('.//a:tbl')
-    tblPr_el = tbl_el[0].xpath('./a:tblPr') if tbl_el else []
+    tbl_el = safe_xpath(shape._element, './/a:tbl')
+    tblPr_el = safe_xpath(tbl_el[0], './a:tblPr') if tbl_el else []
     
     table_style_id = None
     first_row = False
@@ -149,7 +177,7 @@ def analyze_table_shape(shape):
     band_col = False
     if tblPr_el:
         pr = tblPr_el[0]
-        style_el = pr.xpath('./a:tableStyleId')
+        style_el = safe_xpath(pr, './a:tableStyleId')
         if style_el:
             table_style_id = style_el[0].text
         first_row = pr.attrib.get('firstRow') == '1'
@@ -208,7 +236,8 @@ def analyze_table_shape(shape):
                         font_name = run.font.name or "Arial"
                         is_bold = bool(run.font.bold)
                         is_italic = bool(run.font.italic)
-                        run_clr = get_color_dict(run.font.color, run._r.xpath('./a:rPr')[0] if run._r.xpath('./a:rPr') else None)
+                        rPr_list = safe_xpath(run._r, './a:rPr')
+                        run_clr = get_color_dict(run.font.color, rPr_list[0] if rPr_list else None)
                         p_dict['runs'].append({
                             'text': run.text,
                             'font_name': font_name,
@@ -260,7 +289,8 @@ def analyze_textbox_shape(shape):
             font_size = pt_to_float(run.font.size)
             font_name = run.font.name or "Arial"
             is_bold = bool(run.font.bold)
-            run_clr = get_color_dict(run.font.color, run._r.xpath('./a:rPr')[0] if run._r.xpath('./a:rPr') else None)
+            rPr_list = safe_xpath(run._r, './a:rPr')
+            run_clr = get_color_dict(run.font.color, rPr_list[0] if rPr_list else None)
             p_dict['runs'].append({
                 'text': run.text,
                 'font_name': font_name,
@@ -314,7 +344,6 @@ def generate_builder_code(blueprint, output_file='generated_slide2_builder.py'):
         "    '''Builds both tables, title commentary, and footer on an empty slide.'''",
     ]
 
-    # Process tables
     for idx, tbl in enumerate(blueprint.get('tables', [])):
         var_tbl = f"table_{idx+1}"
         var_sh = f"shape_{idx+1}"
@@ -322,7 +351,6 @@ def generate_builder_code(blueprint, output_file='generated_slide2_builder.py'):
         code.append(f"    {var_sh} = slide.shapes.add_table({tbl['num_rows']}, {tbl['num_cols']}, Inches({tbl['left_in']}), Inches({tbl['top_in']}), Inches({tbl['width_in']}), Inches({tbl['height_in']}))")
         code.append(f"    {var_tbl} = {var_sh}.table")
         
-        # Disable bandRow/firstRow if needed
         band_val = '1' if tbl['band_row'] else '0'
         first_row_val = '1' if tbl['first_row'] else '0'
         code.append(f"    # Table style properties")
@@ -330,25 +358,21 @@ def generate_builder_code(blueprint, output_file='generated_slide2_builder.py'):
         code.append(f"    tblPr.set('bandRow', '{band_val}')")
         code.append(f"    tblPr.set('firstRow', '{first_row_val}')")
 
-        # Column widths
         code.append(f"    # Column widths")
         code.append(f"    col_widths = {tbl['column_widths_in']}")
         code.append(f"    for i, w in enumerate(col_widths):")
         code.append(f"        {var_tbl}.columns[i].width = Inches(w)")
 
-        # Row heights
         code.append(f"    # Row heights")
         code.append(f"    row_heights = {tbl['row_heights_in']}")
         code.append(f"    for i, h in enumerate(row_heights):")
         code.append(f"        {var_tbl}.rows[i].height = Inches(h)")
 
-        # Merges
         if tbl.get('merges'):
             code.append(f"    # Merges")
             for m in tbl['merges']:
                 code.append(f"    {var_tbl}.cell({m['start_row']}, {m['start_col']}).merge({var_tbl}.cell({m['end_row']}, {m['end_col']}))")
 
-        # Cell fills & initial text
         code.append(f"    # Cell fills and text")
         for r_idx, row in enumerate(tbl['cells']):
             for c_idx, cell in enumerate(row):
@@ -359,12 +383,10 @@ def generate_builder_code(blueprint, output_file='generated_slide2_builder.py'):
                 if hex_fill:
                     code.append(f"    set_cell_background({var_tbl}.cell({r_idx}, {c_idx}), '{hex_fill}')")
                 
-                # Check text in cell
                 cell_text = "\n".join(p['text'] for p in cell.get('paragraphs', []) if p['text'].strip())
                 if cell_text:
                     safe_txt = cell_text.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
                     code.append(f"    {var_tbl}.cell({r_idx}, {c_idx}).text = '{safe_txt}'")
-                    # First run font formatting
                     first_run = None
                     for p in cell.get('paragraphs', []):
                         if p.get('runs'):
@@ -409,7 +431,6 @@ def inspect_presentation(pptx_path, target_slide_idx=2):
 
     # Find target slide
     slide_num = target_slide_idx
-    # Check if target_slide has tables; if not, search all slides for tables
     chosen_slide = None
     if 1 <= slide_num <= len(prs.slides):
         s = prs.slides[slide_num - 1]
@@ -417,7 +438,6 @@ def inspect_presentation(pptx_path, target_slide_idx=2):
             chosen_slide = s
 
     if not chosen_slide:
-        # Search all slides for slide with most tables
         slide_table_counts = []
         for i, s in enumerate(prs.slides, start=1):
             t_cnt = sum(1 for sh in s.shapes if sh.has_table)
@@ -433,7 +453,6 @@ def inspect_presentation(pptx_path, target_slide_idx=2):
             slide_num = 1
 
     target_slide = chosen_slide
-
     print(f"[*] Analyzing Slide {slide_num} (Shapes count: {len(target_slide.shapes)})")
 
     tables_data = []
@@ -441,27 +460,30 @@ def inspect_presentation(pptx_path, target_slide_idx=2):
     other_shapes = []
 
     for sh_idx, shape in enumerate(target_slide.shapes):
-        if shape.has_table:
-            print(f"  -> Found Table #{len(tables_data)+1}: '{shape.name}' (Shape ID: {shape.shape_id})")
-            tbl_info = analyze_table_shape(shape)
-            tables_data.append(tbl_info)
-            print(f"     Dimensions: {tbl_info['num_rows']} rows x {tbl_info['num_cols']} cols")
-            print(f"     Geometry: Left={tbl_info['left_in']}\", Top={tbl_info['top_in']}\", Width={tbl_info['width_in']}\", Height={tbl_info['height_in']}\"")
-            print(f"     BandRow={tbl_info['band_row']}, FirstRow={tbl_info['first_row']}")
-        elif shape.has_text_frame:
-            tb_info = analyze_textbox_shape(shape)
-            textboxes_data.append(tb_info)
-            snippet = shape.text_frame.text[:40].replace('\n', ' ')
-            print(f"  -> Found TextBox: '{shape.name}' (Left={tb_info['left_in']}\", Top={tb_info['top_in']}\") Text: '{snippet}...'")
-        else:
-            other_shapes.append({
-                'name': shape.name,
-                'shape_id': shape.shape_id,
-                'left_in': emu_to_in(shape.left),
-                'top_in': emu_to_in(shape.top),
-                'width_in': emu_to_in(shape.width),
-                'height_in': emu_to_in(shape.height)
-            })
+        try:
+            if shape.has_table:
+                print(f"  -> Found Table #{len(tables_data)+1}: '{shape.name}' (Shape ID: {shape.shape_id})")
+                tbl_info = analyze_table_shape(shape)
+                tables_data.append(tbl_info)
+                print(f"     Dimensions: {tbl_info['num_rows']} rows x {tbl_info['num_cols']} cols")
+                print(f"     Geometry: Left={tbl_info['left_in']}\", Top={tbl_info['top_in']}\", Width={tbl_info['width_in']}\", Height={tbl_info['height_in']}\"")
+                print(f"     BandRow={tbl_info['band_row']}, FirstRow={tbl_info['first_row']}")
+            elif shape.has_text_frame:
+                tb_info = analyze_textbox_shape(shape)
+                textboxes_data.append(tb_info)
+                snippet = shape.text_frame.text[:40].replace('\n', ' ')
+                print(f"  -> Found TextBox: '{shape.name}' (Left={tb_info['left_in']}\", Top={tb_info['top_in']}\") Text: '{snippet}...'")
+            else:
+                other_shapes.append({
+                    'name': shape.name,
+                    'shape_id': shape.shape_id,
+                    'left_in': emu_to_in(shape.left),
+                    'top_in': emu_to_in(shape.top),
+                    'width_in': emu_to_in(shape.width),
+                    'height_in': emu_to_in(shape.height)
+                })
+        except Exception as ex:
+            print(f"  [!] Warning on shape '{shape.name}': {ex}")
 
     blueprint = {
         'presentation_name': path.name,
@@ -527,7 +549,6 @@ def find_candidate_presentation():
     candidates = list(Path('.').glob('*.pptx'))
     if not candidates:
         return None
-    # Prioritize template or BOT or CRM decks
     for c in candidates:
         name_l = c.name.lower()
         if 'crm' in name_l or 'bot' in name_l or 'report' in name_l or 'deck' in name_l or 'slide' in name_l:
