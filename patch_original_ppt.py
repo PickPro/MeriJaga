@@ -1347,9 +1347,17 @@ def copy_slide_from_template_com(template_path, source_path, output_path, slide_
     if not os.path.isfile(s_abs):
         raise FileNotFoundError(f"Source PPTX not found: {s_abs}")
         
-    shutil.copy2(s_abs, o_abs)
+    if s_abs != o_abs:
+        shutil.copy2(s_abs, o_abs)
     
-    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+    try:
+        ppt_app = win32com.client.DispatchEx("PowerPoint.Application")
+    except Exception:
+        ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+    try:
+        ppt_app.DisplayAlerts = 1
+    except Exception:
+        pass
     pres = None
     try:
         pres = ppt_app.Presentations.Open(o_abs, WithWindow=False)

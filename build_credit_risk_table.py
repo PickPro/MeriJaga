@@ -18,6 +18,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import traceback
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -734,37 +736,82 @@ CURRENT_FLAG_FILE = None
 ACTIVE_LOGGER = None
 
 
-class SimpleLogger:
+class DualLogger:
+    """Enterprise-grade dual stdout/stderr logger that mirrors all CMD output directly to ppt.log."""
     def __init__(self, filename):
-        self.terminal = sys.stdout
+        self.terminal_out = sys.__stdout__
+        self.terminal_err = sys.__stderr__
         p = Path(filename).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
-        self.log = open(str(p), "w", encoding="utf-8", errors="replace")
+        self.log_file = open(str(p), "w", encoding="utf-8", errors="replace")
 
     def write(self, msg):
-        self.terminal.write(msg)
-        self.terminal.flush()
+        self.terminal_out.write(msg)
+        self.terminal_out.flush()
         try:
-            self.log.write(msg)
-            self.log.flush()
+            self.log_file.write(msg)
+            self.log_file.flush()
         except Exception:
             pass
 
     def flush(self):
-        self.terminal.flush()
+        self.terminal_out.flush()
         try:
-            self.log.flush()
+            self.log_file.flush()
         except Exception:
             pass
 
     def close(self):
         try:
-            self.log.close()
+            self.log_file.close()
+        except Exception:
+            pass
+
+
+def init_early_logging_and_flag(argv):
+    """Detect log and flag files before full argument parsing to capture 100% of pipeline logs."""
+    global CURRENT_FLAG_FILE, ACTIVE_LOGGER
+    log_path = None
+    flag_path = None
+
+    for i, a in enumerate(argv):
+        if a == "--log-file" and i + 1 < len(argv):
+            log_path = argv[i + 1]
+        elif a == "--flag-file" and i + 1 < len(argv):
+            flag_path = argv[i + 1]
+
+    if not log_path or not flag_path:
+        for a in argv[1:]:
+            if a.startswith("-"):
+                continue
+            al = a.lower()
+            if not log_path and (al.endswith(".log") or "log" in Path(al).stem):
+                log_path = a
+            elif not flag_path and (al.endswith((".flag", ".txt")) or "flag" in Path(al).stem):
+                flag_path = a
+
+    if log_path and not ACTIVE_LOGGER:
+        try:
+            ACTIVE_LOGGER = DualLogger(log_path)
+            sys.stdout = ACTIVE_LOGGER
+            sys.stderr = ACTIVE_LOGGER
+            print(f"[*] Automation Anywhere Log initialized: {log_path}")
+        except Exception as e:
+            print(f"Warning: Could not initialize log file: {e}", file=sys.__stderr__)
+
+    if flag_path:
+        CURRENT_FLAG_FILE = flag_path
+        try:
+            p = Path(flag_path).resolve()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(str(p), "w", encoding="utf-8") as f:
+                f.write("running\n")
         except Exception:
             pass
 
 
 def write_flag(status):
+    """Write standardized status to the Automation Anywhere flag file."""
     global CURRENT_FLAG_FILE
     if CURRENT_FLAG_FILE:
         try:
@@ -772,7 +819,7 @@ def write_flag(status):
             p.parent.mkdir(parents=True, exist_ok=True)
             with open(str(p), "w", encoding="utf-8") as f:
                 f.write(f"{status}\n")
-            print(f"[*] Automation Anywhere Flag: '{status}' written to {p}")
+            print(f"[*] Automation Anywhere Flag: '{status}' -> {p}")
         except Exception as e:
             print(f"Warning: Failed to write flag file ({CURRENT_FLAG_FILE}): {e}")
 
@@ -838,7 +885,7 @@ def main():
         # Initialize logging as early as possible
         if log_file and not ACTIVE_LOGGER:
             try:
-                ACTIVE_LOGGER = SimpleLogger(log_file)
+                ACTIVE_LOGGER = DualLogger(log_file)
                 sys.stdout = ACTIVE_LOGGER
                 sys.stderr = ACTIVE_LOGGER
                 print(f"[*] Automation Anywhere Log file started: {log_file}")
@@ -1103,13 +1150,7 @@ def main():
 
 
 if __name__ == "__main__":
-    # Pre-scan arguments for flag file in case of early error
-    for arg in sys.argv[1:]:
-        al = arg.lower()
-        if al.endswith((".flag", ".txt")) or "flag" in Path(al).stem:
-            CURRENT_FLAG_FILE = arg
-            break
-
+    init_early_logging_and_flag(sys.argv)
     exit_code = 1
     try:
         exit_code = main()
@@ -1128,7 +1169,11 @@ if __name__ == "__main__":
             ACTIVE_LOGGER.close()
         raise
     except BaseException as ex:
-        print(f"ERROR: {ex}", file=sys.stderr)
+        print(f"CRITICAL ERROR: {ex}", file=sys.stderr)
+        try:
+            traceback.print_exc(file=sys.stderr)
+        except Exception:
+            pass
         write_flag("error")
         if ACTIVE_LOGGER:
             ACTIVE_LOGGER.close()
