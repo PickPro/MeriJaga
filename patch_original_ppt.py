@@ -1009,10 +1009,10 @@ def update_slide2_title_and_commentary(slide, report):
     tf = tb_shape.text_frame
     tf.word_wrap = True
 
-    dark_navy = RGBColor(35, 41, 54)       # #232936 Exact Presentation Dark Navy
-    green_clr = RGBColor(112, 173, 71)     # #70AD47 Exact Presentation Accent Green
-    amber_clr = RGBColor(242, 174, 0)      # #F2AE00 Exact Presentation Warm Amber/Gold
-    red_clr = RGBColor(193, 0, 27)         # #C1001B Exact KeyBank Pure Corporate Red
+    dark_navy = RGBColor(38, 48, 64)       # #263040 Master Corporate Dark Navy
+    green_clr = RGBColor(112, 173, 71)     # #70AD47 Exact Office Theme Green
+    amber_clr = RGBColor(240, 141, 39)     # #F08D27 Exact Warning Amber
+    red_clr = RGBColor(192, 0, 0)          # #C00000 Exact Breach Red
 
     # 1. Title
     for p in tf.paragraphs:
@@ -1193,9 +1193,9 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
-    amber_color = RGBColor(242, 174, 0)   # #F2AE00 exact presentation warm amber/gold
-    red_color = RGBColor(193, 0, 27)        # #C1001B exact KeyBank corporate red
-    navy_color = RGBColor(35, 41, 54)      # #232936 exact presentation dark navy
+    amber_color = RGBColor(240, 141, 39)   # #F08D27 exact warning amber
+    red_color = RGBColor(192, 0, 0)        # #C00000 exact breach red
+    navy_color = RGBColor(38, 48, 64)      # #263040 exact dark navy
 
     # Header Row 0: Center horizontally and vertically
     for c_i in range(len(table.columns)):
@@ -1280,7 +1280,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                 tcPr.append(lnB)
 
     # 5. Row heights matching Ideal_slide_ppt.pptx exactly:
-    row_heights = [0.4000, 0.2200, 0.3200, 0.2200, 1.3600, 0.9600, 0.2500, 0.6500, 0.3600]
+    row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
     for i, h in enumerate(row_heights):
         if i < len(table.rows):
             table.rows[i].height = Inches(h)
@@ -1330,6 +1330,8 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
         'extra_tables_created': 0
     }
 
+
+
 def copy_slide_from_template_com(template_path, source_path, output_path, slide_index=2):
     """Natively copies slide_index from template_path into source_path at slide_index,
     replacing any placeholder/empty slide at that position, and saves to output_path.
@@ -1371,22 +1373,12 @@ def copy_slide_from_template_com(template_path, source_path, output_path, slide_
 
 def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=False,
                new_table_slide=False, include_count_slide=False,
-               same_slide=False, count_reference_pptx=None, template_pptx=None):
+               same_slide=False, count_reference_pptx=None):
     source = Path(source).resolve(); output = Path(output).resolve()
     if not source.is_file():
         raise ValueError(f'Original PPTX not found: {source}')
     if source == output:
         raise ValueError('Refusing to overwrite the original PowerPoint. Use a different --output.')
-
-    if template_pptx:
-        template_path = Path(template_pptx).resolve()
-        if not template_path.is_file():
-            raise ValueError(f'Template PPTX not found: {template_path}')
-        copy_slide_from_template_com(template_path, source, output, slide_index=2)
-        working_source = output
-    else:
-        working_source = source
-
     report = json.loads(Path(audit).read_text(encoding='utf-8'))
     validate_report(report)
 
@@ -1395,7 +1387,7 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
     if same_slide and new_table_slide:
         raise ValueError('Cannot combine --same-slide with --new-table-slide')
 
-    prs = Presentation(str(working_source))
+    prs = Presentation(str(source))
     if len(prs.slides) == 1:
         target_slide = prs.slides[0]
         slide_num = 1
@@ -1529,10 +1521,9 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
 
 def main():
     p = argparse.ArgumentParser(description='Patch the original native PPT table with single or dedicated slide layout')
-    p.add_argument('--pptx', '--source', '-s', required=True, dest='pptx', help='Target PPTX deck (e.g. Final Deck with empty Slide 2, or template deck)')
-    p.add_argument('--template', '-t', default=None, help='Old template PPTX containing the authentic Slide 2 structure to copy from')
-    p.add_argument('--audit', '-a', required=True, help='Verified 2Q26 or 3Q26 .audit.json from generator')
-    p.add_argument('--output', '-o', required=True, help='New output PPTX; original will not be overwritten')
+    p.add_argument('--pptx', required=True, help='Original CRM Report Slides for BOT.pptx')
+    p.add_argument('--audit', required=True, help='Verified 2Q26 or 3Q26 .audit.json from generator')
+    p.add_argument('--output', required=True, help='New output PPTX; original will not be overwritten')
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--allow-possible-overflow', action='store_true')
     p.add_argument('--new-table-slide', action='store_true', help='Move main table to a new dedicated Slide 3')
@@ -1541,7 +1532,7 @@ def main():
     a = p.parse_args()
     result = patch_pptx(a.pptx, a.output, a.audit, a.dry_run, a.allow_possible_overflow,
                         new_table_slide=a.new_table_slide, same_slide=a.same_slide,
-                        count_reference_pptx=a.count_reference_pptx, template_pptx=a.template)
+                        count_reference_pptx=a.count_reference_pptx)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
