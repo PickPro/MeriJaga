@@ -730,14 +730,63 @@ def write_count_summary_workbook(report, dest):
     return str(dest)
 
 
+CURRENT_FLAG_FILE = None
+ACTIVE_LOGGER = None
+
+
+class SimpleLogger:
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        p = Path(filename).resolve()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        self.log = open(str(p), "w", encoding="utf-8", errors="replace")
+
+    def write(self, msg):
+        self.terminal.write(msg)
+        self.terminal.flush()
+        try:
+            self.log.write(msg)
+            self.log.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        self.terminal.flush()
+        try:
+            self.log.flush()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self.log.close()
+        except Exception:
+            pass
+
+
+def write_flag(status):
+    global CURRENT_FLAG_FILE
+    if CURRENT_FLAG_FILE:
+        try:
+            p = Path(CURRENT_FLAG_FILE).resolve()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(str(p), "w", encoding="utf-8") as f:
+                f.write(f"{status}\n")
+            print(f"[*] Automation Anywhere Flag: '{status}' written to {p}")
+        except Exception as e:
+            print(f"Warning: Failed to write flag file ({CURRENT_FLAG_FILE}): {e}")
+
+
 def main():
     p = argparse.ArgumentParser(description="Generate the single PPTX Credit Risk table")
-    p.add_argument("files", nargs="*", help="Optional files in sequence: [master_excel] [latest_excel] [template_pptx] [output_pptx] OR [final_deck] [output_pptx]")
+    p.add_argument("files", nargs="*", help="Optional files in sequence: [master_excel] [latest_excel] [template_pptx] [output_pptx] [ppt.log] [flag.txt]")
     p.add_argument("--excel", default=None, help="Input workbook .xlsx")
     p.add_argument("--quarter", default="3Q26", help="Reporting quarter: 2Q26 or 3Q26 (default: 3Q26)")
     p.add_argument("--status-csv", help="Optional verified CSV with Metric ID and quarter/status")
     p.add_argument("--latest-period-excel", help="Latest_Period_Metrics.xlsx: actual values in D/E/F (Green/Yellow/Red), matching B Filename to original B DownloadCrosstab")
     p.add_argument("--output", help="Output .pptx path")
+    p.add_argument("--log-file", default=None, help="Optional log file path (e.g. ppt.log)")
+    p.add_argument("--flag-file", default=None, help="Optional flag file path (e.g. flag.txt)")
     p.add_argument("--expected-total", type=int, default=None, help="Optional strict total-check (e.g. 125)")
     p.add_argument("--preview", action="store_true", help="Make a standalone PPTX preview. Not a patch of the original PowerPoint.")
     p.add_argument("--template-pptx", help="Original PPTX to patch (Slide 2, shape 8) after verified status check")
@@ -755,10 +804,49 @@ def main():
         p.error(f"unrecognized arguments: {' '.join(unk_flags)}")
     args.files.extend([x for x in unknown if not x.startswith("-")])
 
+    global CURRENT_FLAG_FILE, ACTIVE_LOGGER
+    log_file = args.log_file
+    flag_file = args.flag_file
+
     # Intelligent auto-mapping for sequential/positional files:
     if args.files:
-        excel_files = [f for f in args.files if f.lower().endswith((".xlsx", ".xlsm", ".xls"))]
-        pptx_files = [f for f in args.files if f.lower().endswith((".pptx", ".ppt"))]
+        excel_files = []
+        pptx_files = []
+        trailing_files = []
+
+        for f in args.files:
+            f_low = f.lower()
+            if f_low.endswith((".xlsx", ".xlsm", ".xls")):
+                excel_files.append(f)
+            elif f_low.endswith((".pptx", ".ppt")):
+                pptx_files.append(f)
+            elif f_low.endswith(".log") or "log" in Path(f_low).stem:
+                if not log_file:
+                    log_file = f
+            elif f_low.endswith((".txt", ".flag")) or "flag" in Path(f_low).stem:
+                if not flag_file:
+                    flag_file = f
+            else:
+                trailing_files.append(f)
+
+        if trailing_files:
+            if not log_file:
+                log_file = trailing_files.pop(0)
+            if trailing_files and not flag_file:
+                flag_file = trailing_files.pop(0)
+
+        # Initialize logging as early as possible
+        if log_file and not ACTIVE_LOGGER:
+            try:
+                ACTIVE_LOGGER = SimpleLogger(log_file)
+                sys.stdout = ACTIVE_LOGGER
+                sys.stderr = ACTIVE_LOGGER
+                print(f"[*] Automation Anywhere Log file started: {log_file}")
+            except Exception as e:
+                print(f"Warning: Could not start logger: {e}")
+
+        if flag_file:
+            CURRENT_FLAG_FILE = flag_file
 
         if not args.excel and len(excel_files) >= 1:
             args.excel = excel_files[0]
@@ -811,6 +899,17 @@ def main():
         p.error(f"Excel file not found: {excel}")
     output = Path(args.output).resolve() if args.output else excel.with_name(f"Credit_Risk_Table_{args.quarter}.pptx")
     output.parent.mkdir(parents=True, exist_ok=True)
+    # If output was explicitly specified, try to overwrite it cleanly so RPA always gets expected filename
+    if args.output or (args.files and any(f.lower().endswith(('.pptx', '.ppt')) for f in args.files)):
+        try:
+            if output.exists():
+                output.unlink(missing_ok=True)
+            if output.with_suffix('.audit.csv').exists():
+                output.with_suffix('.audit.csv').unlink(missing_ok=True)
+            if output.with_suffix('.audit.json').exists():
+                output.with_suffix('.audit.json').unlink(missing_ok=True)
+        except Exception:
+            pass
     # Repeat runs must not clobber a presentation or audits held open in Office.
     requested=output
     if output.exists() or output.with_suffix('.audit.csv').exists() or output.with_suffix('.audit.json').exists():
@@ -1004,8 +1103,36 @@ def main():
 
 
 if __name__ == "__main__":
+    # Pre-scan arguments for flag file in case of early error
+    for arg in sys.argv[1:]:
+        al = arg.lower()
+        if al.endswith((".flag", ".txt")) or "flag" in Path(al).stem:
+            CURRENT_FLAG_FILE = arg
+            break
+
+    exit_code = 1
     try:
-        sys.exit(main())
-    except Exception as ex:
+        exit_code = main()
+        if exit_code == 0:
+            write_flag("success")
+        else:
+            write_flag("error")
+        sys.exit(exit_code)
+    except SystemExit as se:
+        code = se.code if isinstance(se.code, int) else (0 if se.code is None else 1)
+        if code == 0:
+            write_flag("success")
+        else:
+            write_flag("error")
+        if ACTIVE_LOGGER:
+            ACTIVE_LOGGER.close()
+        raise
+    except BaseException as ex:
         print(f"ERROR: {ex}", file=sys.stderr)
+        write_flag("error")
+        if ACTIVE_LOGGER:
+            ACTIVE_LOGGER.close()
         sys.exit(1)
+    finally:
+        if ACTIVE_LOGGER:
+            ACTIVE_LOGGER.close()

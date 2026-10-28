@@ -1212,7 +1212,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     # Data Rows 1 to 8: Executive category dividing borders and soft alternating fills
     for r_idx in range(1, len(table.rows)):
         is_cat_bottom = r_idx in (2, 4, 8)
-        border_hex = '808896' if is_cat_bottom else None
+        border_hex = '000000' if is_cat_bottom else None
         border_pt = 1.5 if is_cat_bottom else 0
         row_grey = r_idx in (2, 4, 8)
 
@@ -1272,7 +1272,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             for el in list(tcPr):
                 if el.tag.endswith('lnB'):
                     tcPr.remove(el)
-            lnB = parse_xml(f'<a:lnB xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="{w_emu}" cmpd="sng"><a:solidFill><a:srgbClr val="808896"/></a:solidFill></a:lnB>')
+            lnB = parse_xml(f'<a:lnB xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="{w_emu}" cmpd="sng"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:lnB>')
             first_fill = next((el for el in list(tcPr) if any(el.tag.endswith(x) for x in ['solidFill', 'noFill', 'gradFill', 'blipFill'])), None)
             if first_fill is not None:
                 first_fill.addprevious(lnB)
