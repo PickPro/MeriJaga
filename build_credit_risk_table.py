@@ -740,6 +740,7 @@ def main():
     p.add_argument("--expected-total", type=int, default=None, help="Optional strict total-check (e.g. 125)")
     p.add_argument("--preview", action="store_true", help="Make a standalone PPTX preview. Not a patch of the original PowerPoint.")
     p.add_argument("--template-pptx", help="Original PPTX to patch (Slide 2, shape 8) after verified status check")
+    p.add_argument("--target-deck", "--final-deck", dest="target_deck", default=None, help="New deck PPTX (e.g. Final Deck with empty Slide 2) to receive the patched Slide 2")
     p.add_argument("--allow-possible-overflow", action="store_true", help="Permit possible overflow for manual QA only")
     p.add_argument("--include-count-summary", action="store_true", help="Generate COUNT.zip-style color/level Excel and insert a 3Q26 snapshot slide before the detailed table")
     p.add_argument("--processing-dir", help="OPTIONAL read-only inventory of local Processing .xlsx filenames to help locate unclassified metrics; never auto-classifies")
@@ -877,19 +878,53 @@ def main():
     if args.include_count_summary:
         count_path=output.with_name(output.stem + '_Color_Level_Summary.xlsx')
         print('COUNT workbook:', write_count_summary_workbook(report,count_path))
+    target_deck = getattr(args, 'target_deck', None) or getattr(args, 'final_deck', None)
+    if not target_deck:
+        for candidate in ["Final Deck.pptx", "final_deck.pptx", "Final_Deck.pptx", "Final Deck.ppt", "final_deck.ppt"]:
+            if os.path.isfile(candidate):
+                target_deck = candidate
+                print(f"[*] Auto-detected Final Deck with empty Slide 2: {candidate}")
+                break
+
     if args.template_pptx:
-        from patch_original_ppt import patch_pptx
-        result = patch_pptx(
-            args.template_pptx,
-            output,
-            report_path,
-            allow_possible_overflow=args.allow_possible_overflow,
-            new_table_slide=args.new_table_slide,
-            include_count_slide=args.include_count_summary,
-            same_slide=args.same_slide,
-            count_reference_pptx=args.count_reference_pptx
-        )
-        print(f"ORIGINAL PPT TEMPLATE PATCHED: {result['output']}")
+        from patch_original_ppt import patch_pptx, copy_slide_from_template_com
+        if target_deck:
+            temp_output = output.with_name(output.stem + "_temp_patched_template.pptx")
+            result = patch_pptx(
+                args.template_pptx,
+                temp_output,
+                report_path,
+                allow_possible_overflow=args.allow_possible_overflow,
+                new_table_slide=args.new_table_slide,
+                include_count_slide=args.include_count_summary,
+                same_slide=args.same_slide,
+                count_reference_pptx=args.count_reference_pptx
+            )
+            # Inject finished Slide 2 into target_deck (Final Deck)
+            copy_slide_from_template_com(
+                template_path=temp_output,
+                source_path=target_deck,
+                output_path=output,
+                slide_index=2
+            )
+            try:
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+            except Exception:
+                pass
+            print(f"SLIDE 2 INJECTED INTO FINAL DECK: {output}")
+        else:
+            result = patch_pptx(
+                args.template_pptx,
+                output,
+                report_path,
+                allow_possible_overflow=args.allow_possible_overflow,
+                new_table_slide=args.new_table_slide,
+                include_count_slide=args.include_count_summary,
+                same_slide=args.same_slide,
+                count_reference_pptx=args.count_reference_pptx
+            )
+            print(f"ORIGINAL PPT TEMPLATE PATCHED: {result['output']}")
         if args.same_slide:
             print(f"[5] SLIDE 2 SAME-SLIDE PRESENTATION & GEOMETRY VERIFICATION")
             print(f"  * Slide Title & Commentary:     UPDATED ({args.quarter} Credit Risk Metrics | Active Level 1 Status)")

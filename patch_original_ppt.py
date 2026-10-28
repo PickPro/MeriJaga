@@ -56,10 +56,11 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     quarter = report.get('quarter', '3Q26')
     prior_quarter = get_prior_quarter(quarter)
 
-    # 1. Title & Commentary Text Frame (Left=0.2164", Top=0.0108", Width=8.2", Height=2.2")
-    tb_shape = slide.shapes.add_textbox(Inches(0.2164), Inches(0.0108), Inches(8.2), Inches(2.2))
+    # 1. Title & Commentary Text Frame (Left=0.40", Top=0.35", Width=8.2", Height=1.85")
+    tb_shape = slide.shapes.add_textbox(Inches(0.40), Inches(0.35), Inches(8.2), Inches(1.85))
     tf = tb_shape.text_frame
     tf.word_wrap = True
+    tf.margin_left = tf.margin_top = tf.margin_right = tf.margin_bottom = 0
     p0 = tf.paragraphs[0]
     p0.text = f"{quarter} Credit Risk Metrics"
     p0.font.bold = True
@@ -79,12 +80,12 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     r1 = p1.add_run()
     r1.text = "• Total KeyCorp Level 1 Asset Quality: "
     r1.font.bold = True
-    r1.font.size = Pt(12)
+    r1.font.size = Pt(11.0)
     r1.font.name = "Arial"
     r2 = p1.add_run()
     r2.text = l1_status
     r2.font.bold = False
-    r2.font.size = Pt(12)
+    r2.font.size = Pt(11.0)
     r2.font.name = "Arial"
 
     bullets = [
@@ -101,7 +102,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
         r = p.add_run()
         r.text = b_pre + b_val
         r.font.bold = is_hdr
-        r.font.size = Pt(12)
+        r.font.size = Pt(11.0)
         r.font.name = "Arial"
 
     dark_navy = RGBColor(38, 48, 64)
@@ -111,8 +112,8 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     white = RGBColor(255, 255, 255)
 
     # 2. Top-Right Summary Counts Table (6 rows x 8 cols)
-    # Exact geometry from template inspection: Left=8.6167", Top=0.3273", Width=4.6", Height=1.6833"
-    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.3273), Inches(4.6), Inches(1.6833))
+    # Exact geometry from template inspection: Left=8.6167", Top=0.345", Width=4.6", Height=1.45"
+    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.345), Inches(4.6), Inches(1.45))
     s_tbl = summary_shape.table
     try:
         s_tbl._tbl.tblPr.set('bandRow', '0')
@@ -120,10 +121,10 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     except Exception:
         pass
 
-    s_col_widths = [0.6, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0]
+    s_col_widths = [0.65, 0.48, 0.48, 0.49, 0.49, 0.49, 0.49, 1.03]
     for i, w in enumerate(s_col_widths):
         s_tbl.columns[i].width = Inches(w)
-    s_row_heights = [0.25, 0.25, 0.2, 0.2, 0.2, 0.1382]
+    s_row_heights = [0.46, 0.22, 0.19, 0.19, 0.19, 0.20]
     for i, h in enumerate(s_row_heights):
         s_tbl.rows[i].height = Inches(h)
 
@@ -135,9 +136,9 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     s_tbl.cell(0, 7).merge(s_tbl.cell(1, 7))
 
     # Header Text on Summary Table
-    s_tbl.cell(0, 1).text = "Within Risk Appetite"
-    s_tbl.cell(0, 3).text = "Exceeds Risk Appetite Warning"
-    s_tbl.cell(0, 5).text = "Breaches Risk Appetite Limit"
+    s_tbl.cell(0, 1).text = "Within\nRisk Appetite"
+    s_tbl.cell(0, 3).text = "Exceeds\nRisk Appetite\nWarning"
+    s_tbl.cell(0, 5).text = "Breaches\nRisk Appetite\nLimit"
     s_tbl.cell(0, 7).text = "Total"
 
     s_tbl.cell(1, 1).text = prior_quarter
@@ -1094,7 +1095,7 @@ def update_slide2_title_and_commentary(slide, report):
                 run = target_p.add_run()
                 run.text = r_text
                 run.font.name = "Arial"
-                run.font.size = Pt(12)
+                run.font.size = Pt(11.0)
                 run.font.bold = r_bold
                 run.font.color.rgb = r_color
 
@@ -1329,14 +1330,63 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
         'extra_tables_created': 0
     }
 
+def copy_slide_from_template_com(template_path, source_path, output_path, slide_index=2):
+    """Natively copies slide_index from template_path into source_path at slide_index,
+    replacing any placeholder/empty slide at that position, and saves to output_path.
+    Uses PowerPoint COM for 100% native fidelity."""
+    import win32com.client, shutil, os
+    
+    t_abs = os.path.abspath(str(template_path))
+    s_abs = os.path.abspath(str(source_path))
+    o_abs = os.path.abspath(str(output_path))
+    
+    if not os.path.isfile(t_abs):
+        raise FileNotFoundError(f"Template PPTX not found: {t_abs}")
+    if not os.path.isfile(s_abs):
+        raise FileNotFoundError(f"Source PPTX not found: {s_abs}")
+        
+    shutil.copy2(s_abs, o_abs)
+    
+    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+    pres = None
+    try:
+        pres = ppt_app.Presentations.Open(o_abs, WithWindow=False)
+        total_before = pres.Slides.Count
+        insert_after = max(0, slide_index - 1)
+        pres.Slides.InsertFromFile(t_abs, insert_after, slide_index, slide_index)
+        if pres.Slides.Count > total_before and total_before >= slide_index:
+            pres.Slides(slide_index + 1).Delete()
+        pres.Save()
+    finally:
+        if pres is not None:
+            try: pres.Close()
+            except Exception: pass
+        try:
+            if ppt_app.Presentations.Count == 0:
+                ppt_app.Quit()
+        except Exception: pass
+        
+    return o_abs
+
+
 def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=False,
                new_table_slide=False, include_count_slide=False,
-               same_slide=False, count_reference_pptx=None):
+               same_slide=False, count_reference_pptx=None, template_pptx=None):
     source = Path(source).resolve(); output = Path(output).resolve()
     if not source.is_file():
         raise ValueError(f'Original PPTX not found: {source}')
     if source == output:
         raise ValueError('Refusing to overwrite the original PowerPoint. Use a different --output.')
+
+    if template_pptx:
+        template_path = Path(template_pptx).resolve()
+        if not template_path.is_file():
+            raise ValueError(f'Template PPTX not found: {template_path}')
+        copy_slide_from_template_com(template_path, source, output, slide_index=2)
+        working_source = output
+    else:
+        working_source = source
+
     report = json.loads(Path(audit).read_text(encoding='utf-8'))
     validate_report(report)
 
@@ -1345,7 +1395,7 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
     if same_slide and new_table_slide:
         raise ValueError('Cannot combine --same-slide with --new-table-slide')
 
-    prs = Presentation(str(source))
+    prs = Presentation(str(working_source))
     if len(prs.slides) == 1:
         target_slide = prs.slides[0]
         slide_num = 1
@@ -1479,9 +1529,10 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
 
 def main():
     p = argparse.ArgumentParser(description='Patch the original native PPT table with single or dedicated slide layout')
-    p.add_argument('--pptx', required=True, help='Original CRM Report Slides for BOT.pptx')
-    p.add_argument('--audit', required=True, help='Verified 2Q26 or 3Q26 .audit.json from generator')
-    p.add_argument('--output', required=True, help='New output PPTX; original will not be overwritten')
+    p.add_argument('--pptx', '--source', '-s', required=True, dest='pptx', help='Target PPTX deck (e.g. Final Deck with empty Slide 2, or template deck)')
+    p.add_argument('--template', '-t', default=None, help='Old template PPTX containing the authentic Slide 2 structure to copy from')
+    p.add_argument('--audit', '-a', required=True, help='Verified 2Q26 or 3Q26 .audit.json from generator')
+    p.add_argument('--output', '-o', required=True, help='New output PPTX; original will not be overwritten')
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--allow-possible-overflow', action='store_true')
     p.add_argument('--new-table-slide', action='store_true', help='Move main table to a new dedicated Slide 3')
@@ -1490,7 +1541,7 @@ def main():
     a = p.parse_args()
     result = patch_pptx(a.pptx, a.output, a.audit, a.dry_run, a.allow_possible_overflow,
                         new_table_slide=a.new_table_slide, same_slide=a.same_slide,
-                        count_reference_pptx=a.count_reference_pptx)
+                        count_reference_pptx=a.count_reference_pptx, template_pptx=a.template)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
