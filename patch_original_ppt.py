@@ -934,7 +934,7 @@ def copy_or_insert_logo(prs, target_slide):
         try:
             cur_idx = list(prs.slides).index(target_slide)
             if cur_idx + 1 < len(prs.slides):
-                search_order.append(prs.slides[cur_idx + 1])
+                search_order.append(prs.slides[cur_idx - 1])
             if cur_idx - 1 >= 0:
                 search_order.append(prs.slides[cur_idx - 1])
             for s in prs.slides:
@@ -1207,7 +1207,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(1.7)
+    table._graphic_frame.top = Inches(1.65)
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
@@ -1247,8 +1247,8 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             # Divider lines are required across all columns including Column 0 ('Credit Risk Metrics')
             set_cell_border_and_fill(cell, fill_hex=c_fill, bottom_border_hex=border_hex, bottom_border_pt=border_pt)
 
-            cell.margin_top = Inches(0.002)
-            cell.margin_bottom = Inches(0.002)
+            cell.margin_top = Inches(0.005)
+            cell.margin_bottom = Inches(0.005)
             cell.margin_left = Inches(0.03)
             cell.margin_right = Inches(0.03)
 
@@ -1328,7 +1328,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     _add_line(table.cell(8, 0), 'lnB')
 
     # 5. Row heights matching Ideal_slide_ppt.pptx exactly:
-    row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
+    row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.5600]
     for i, h in enumerate(row_heights):
         if i < len(table.rows):
             table.rows[i].height = Inches(h)
