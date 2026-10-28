@@ -1009,10 +1009,10 @@ def update_slide2_title_and_commentary(slide, report):
     tf = tb_shape.text_frame
     tf.word_wrap = True
 
-    dark_navy = RGBColor(38, 48, 64)       # #263040 Master Corporate Dark Navy
-    green_clr = RGBColor(112, 173, 71)     # #70AD47 Exact Office Theme Green
-    amber_clr = RGBColor(240, 141, 39)     # #F08D27 Exact Warning Amber
-    red_clr = RGBColor(192, 0, 0)          # #C00000 Exact Breach Red
+    dark_navy = RGBColor(35, 41, 54)       # #232936 Exact Presentation Dark Navy
+    green_clr = RGBColor(112, 173, 71)     # #70AD47 Exact Presentation Accent Green
+    amber_clr = RGBColor(242, 174, 0)      # #F2AE00 Exact Presentation Warm Amber/Gold
+    red_clr = RGBColor(193, 0, 27)         # #C1001B Exact KeyBank Pure Corporate Red
 
     # 1. Title
     for p in tf.paragraphs:
@@ -1193,9 +1193,9 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
-    amber_color = RGBColor(240, 141, 39)   # #F08D27 exact warning amber
-    red_color = RGBColor(192, 0, 0)        # #C00000 exact breach red
-    navy_color = RGBColor(38, 48, 64)      # #263040 exact dark navy
+    amber_color = RGBColor(242, 174, 0)   # #F2AE00 exact presentation warm amber/gold
+    red_color = RGBColor(193, 0, 27)        # #C1001B exact KeyBank corporate red
+    navy_color = RGBColor(35, 41, 54)      # #232936 exact presentation dark navy
 
     # Header Row 0: Center horizontally and vertically
     for c_i in range(len(table.columns)):
