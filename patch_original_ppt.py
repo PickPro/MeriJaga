@@ -212,6 +212,9 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     try:
         table._tbl.tblPr.set('bandRow', '0')
         table._tbl.tblPr.set('firstRow', '0')
+        tblStyleId = table._tbl.tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId')
+        if tblStyleId is not None:
+            tblStyleId.text = '{21E4AEA4-8DFA-4A89-80CE-4F4B0632609B}'
     except Exception:
         pass
 
@@ -1206,7 +1209,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(1.84)
+    table._graphic_frame.top = Inches(1.74)
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
@@ -1532,29 +1535,20 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
         target_slide = prs.slides.add_slide(prs.slide_layouts[6])
         slide_num = 1
 
-    # Check if target_slide has the 9x7 detailed table
-    tables = [s for s in target_slide.shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
-    if not tables:
-        found_anywhere = False
-        for idx_s, s in enumerate(prs.slides, start=1):
-            t_cand = [sh for sh in s.shapes if sh.has_table and len(sh.table.rows) == 9 and len(sh.table.columns) == 7]
-            if t_cand:
-                target_slide = s
-                tables = t_cand
-                slide_num = idx_s
-                found_anywhere = True
-                break
-        if not found_anywhere:
-            # Slide is empty or non-template! Construct the full native Credit Risk Slide 2 on target_slide!
+    # In same-slide production mode, ALWAYS cleanly wipe and rebuild target_slide (Slide 2)
+    # so that old charts, stale tables, and duplicate footers NEVER linger!
+    if same_slide:
+        shape = setup_empty_slide_for_credit_risk(target_slide, report, prs=prs)
+        table = shape.table
+    else:
+        tables = [s for s in target_slide.shapes if s.has_table and len(s.table.rows) == 9 and len(s.table.columns) == 7]
+        if not tables:
             shape = setup_empty_slide_for_credit_risk(target_slide, report, prs=prs)
             table = shape.table
             same_slide = True
         else:
             shape = tables[0]
             table = shape.table
-    else:
-        shape = tables[0]
-        table = shape.table
     warnings = []
     planned = []
 

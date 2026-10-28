@@ -1113,44 +1113,20 @@ def main():
         return 0
 
     if args.template_pptx:
-        from patch_original_ppt import patch_pptx, copy_slide_from_template_com
-        if target_deck:
-            temp_output = output.with_name(output.stem + "_temp_patched_template.pptx")
-            result = patch_pptx(
-                args.template_pptx,
-                temp_output,
-                report_path,
-                allow_possible_overflow=args.allow_possible_overflow,
-                new_table_slide=args.new_table_slide,
-                include_count_slide=args.include_count_summary,
-                same_slide=args.same_slide,
-                count_reference_pptx=args.count_reference_pptx
-            )
-            # Inject finished Slide 2 into target_deck (Final Deck)
-            copy_slide_from_template_com(
-                template_path=temp_output,
-                source_path=target_deck,
-                output_path=output,
-                slide_index=2
-            )
-            try:
-                if os.path.exists(temp_output):
-                    os.remove(temp_output)
-            except Exception:
-                pass
-            print(f"SLIDE 2 INJECTED INTO FINAL DECK: {output}")
-        else:
-            result = patch_pptx(
-                args.template_pptx,
-                output,
-                report_path,
-                allow_possible_overflow=args.allow_possible_overflow,
-                new_table_slide=args.new_table_slide,
-                include_count_slide=args.include_count_summary,
-                same_slide=args.same_slide,
-                count_reference_pptx=args.count_reference_pptx
-            )
-            print(f"ORIGINAL PPT TEMPLATE PATCHED: {result['output']}")
+        from patch_original_ppt import patch_pptx
+        deck_to_patch = target_deck if target_deck else args.template_pptx
+        print(f"[*] Natively populating Slide 2 into presentation: {deck_to_patch}")
+        result = patch_pptx(
+            deck_to_patch,
+            output,
+            report_path,
+            allow_possible_overflow=args.allow_possible_overflow,
+            new_table_slide=args.new_table_slide,
+            include_count_slide=args.include_count_summary,
+            same_slide=args.same_slide,
+            count_reference_pptx=args.count_reference_pptx
+        )
+        print(f"SLIDE 2 NATIVELY GENERATED IN DECK: {output}")
         if args.same_slide:
             print(f"[5] SLIDE 2 SAME-SLIDE PRESENTATION & GEOMETRY VERIFICATION")
             print(f"  * Slide Title & Commentary:     UPDATED ({args.quarter} Credit Risk Metrics | Active Level 1 Status)")
