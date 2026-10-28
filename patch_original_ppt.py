@@ -47,6 +47,7 @@ def norm(value):
 def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     """Automatically construct the full native Credit Risk Slide 2 structure from scratch
     when an empty slide or arbitrary non-template presentation is provided.
+    First cleans all existing stale shapes, charts, or footers from the slide to avoid ghosting.
     Constructs:
       1. Title & Commentary Text Frame (Upper Left)
       2. Top-Right Summary Counts Table (6 rows x 8 cols)
@@ -54,6 +55,11 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
       4. Footer Notes Text Box
       5. KeyBank Red Key Logo (Bottom Left)
     """
+    # 0. Clean all existing shapes from the slide to avoid ghost overlays and double footers
+    for shape in list(slide.shapes):
+        sp = shape._element
+        sp.getparent().remove(sp)
+
     quarter = report.get('quarter', '3Q26')
     prior_quarter = get_prior_quarter(quarter)
 
@@ -1328,6 +1334,19 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     table._graphic_frame.height = Inches(sum(r.height for r in table.rows) / Inches(1))
 
     # 6. Ensure Footer Notes, Logo & Slide Number matching ppt.pptx exactly and positioned cleanly at the bottom
+    # Deduplicate footer textboxes if multiple exist on the slide
+    conf_shapes = [s for s in slide.shapes if s.has_text_frame and "classification: confidential" in s.text_frame.text.lower()]
+    if len(conf_shapes) > 1:
+        for extra_s in conf_shapes[1:]:
+            sp = extra_s._element
+            sp.getparent().remove(sp)
+
+    num_shapes = [s for s in slide.shapes if s.has_text_frame and s.text_frame.text.strip() == "2"]
+    if len(num_shapes) > 1:
+        for extra_num in num_shapes[1:]:
+            sp = extra_num._element
+            sp.getparent().remove(sp)
+
     for s in slide.shapes:
         if s.has_text_frame and "classification: confidential" in s.text_frame.text.lower():
             s.top = Inches(7.12)

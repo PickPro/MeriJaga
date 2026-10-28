@@ -785,6 +785,8 @@ def init_early_logging_and_flag(argv):
             if a.startswith("-"):
                 continue
             al = a.lower()
+            if al.endswith((".pptx", ".ppt", ".xlsx", ".xlsm", ".xls", ".csv", ".json")):
+                continue
             if not log_path and (al.endswith(".log") or "log" in Path(al).stem):
                 log_path = a
             elif not flag_path and (al.endswith((".flag", ".txt")) or "flag" in Path(al).stem):
@@ -928,6 +930,11 @@ def main():
             args.same_slide = True
             args.include_count_summary = True
             args.draft = True
+
+    # If --final-deck / --target-deck was passed without --template-pptx, use it directly as the source deck
+    if not args.template_pptx and (getattr(args, 'target_deck', None) or getattr(args, 'final_deck', None)):
+        args.template_pptx = getattr(args, 'target_deck', None) or getattr(args, 'final_deck', None)
+        args.target_deck = None
 
     if not args.excel:
         p.error("--excel is required (or supply Master Excel as 1st positional argument)")
@@ -1077,12 +1084,20 @@ def main():
         count_path=output.with_name(output.stem + '_Color_Level_Summary.xlsx')
         print('COUNT workbook:', write_count_summary_workbook(report,count_path))
     target_deck = getattr(args, 'target_deck', None) or getattr(args, 'final_deck', None)
+    if target_deck and args.template_pptx:
+        try:
+            if os.path.abspath(str(target_deck)) == os.path.abspath(str(args.template_pptx)):
+                target_deck = None  # Same deck passed as source; patch directly without redundant COM self-injection
+        except Exception:
+            pass
+
     if not target_deck and not getattr(args, 'standalone', False) and args.template_pptx:
         for candidate in ["Final Deck.pptx", "final_deck.pptx", "Final_Deck.pptx", "Final Deck.ppt", "final_deck.ppt"]:
             if os.path.isfile(candidate):
-                target_deck = candidate
-                print(f"[*] Auto-detected Final Deck with empty Slide 2: {candidate}")
-                break
+                if os.path.abspath(candidate) != os.path.abspath(str(args.template_pptx)):
+                    target_deck = candidate
+                    print(f"[*] Auto-detected Final Deck with empty Slide 2: {candidate}")
+                    break
 
     if getattr(args, 'standalone', False) or not args.template_pptx:
         from patch_original_ppt import create_standalone_deck
