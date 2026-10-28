@@ -57,7 +57,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     prior_quarter = get_prior_quarter(quarter)
 
     # 1. Title & Commentary Text Frame (Left=0.40", Top=0.35", Width=8.2", Height=1.85")
-    tb_shape = slide.shapes.add_textbox(Inches(0.40), Inches(0.35), Inches(8.2), Inches(1.85))
+    tb_shape = slide.shapes.add_textbox(Inches(0.40), Inches(0.18), Inches(8.2), Inches(1.75))
     tf = tb_shape.text_frame
     tf.word_wrap = True
     tf.margin_left = tf.margin_top = tf.margin_right = tf.margin_bottom = 0
@@ -113,7 +113,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
 
     # 2. Top-Right Summary Counts Table (6 rows x 8 cols)
     # Exact geometry from template inspection: Left=8.6167", Top=0.345", Width=4.6", Height=1.45"
-    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.345), Inches(4.6), Inches(1.45))
+    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.18), Inches(4.6), Inches(1.45))
     s_tbl = summary_shape.table
     try:
         s_tbl._tbl.tblPr.set('bandRow', '0')
@@ -200,7 +200,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
 
     # 3. Main Detailed Table (9x7)
     # Exact geometry from template inspection: Left=0.2406", Top=2.24", Width=12.8521", Height=4.535"
-    t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(2.24), Inches(12.8521), Inches(4.535))
+    t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(1.96), Inches(12.8521), Inches(4.535))
     table = t_shape.table
     try:
         table._tbl.tblPr.set('bandRow', '0')
@@ -302,7 +302,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     # 4. Footer Elements (if not present)
     has_footer = any(s.has_text_frame and 'classification: confidential' in s.text_frame.text.lower() for s in slide.shapes)
     if not has_footer:
-        tb_f = slide.shapes.add_textbox(Inches(1.5), Inches(6.98), Inches(10.3), Inches(0.45))
+        tb_f = slide.shapes.add_textbox(Inches(1.5), Inches(7.08), Inches(10.3), Inches(0.38))
         tff = tb_f.text_frame
         tff.word_wrap = True
         tff.margin_left = tff.margin_right = tff.margin_top = tff.margin_bottom = 0
@@ -1001,10 +1001,18 @@ def set_cell_border_and_fill(cell, fill_hex=None, bottom_border_hex='D0D4DC', bo
 
 
 def update_slide2_title_and_commentary(slide, report):
-    """Update Slide 2 Title and Commentary matching official BOT deck exact 11pt typography & colors."""
+    """Update Slide 2 Title and Commentary matching official template exact 11pt typography & single bullets."""
     quarter = report.get('quarter', '3Q26')
     tb = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top < Inches(2.2)), None)
     if not tb: return False
+    # Move Title & Commentary text frame UP to give room for the table
+    tb.top = Inches(0.14)
+    tb.left = Inches(0.40)
+    tb.width = Inches(8.20)
+    tb.text_frame.margin_top = Inches(0.0)
+    tb.text_frame.margin_bottom = Inches(0.0)
+    tb.text_frame.margin_left = Inches(0.0)
+    tb.text_frame.margin_right = Inches(0.0)
     tf = tb.text_frame
     tf.word_wrap = True
 
@@ -1046,34 +1054,45 @@ def update_slide2_title_and_commentary(slide, report):
     ci_w = num_words.get(ci_red, str(ci_red))
     p7_runs = [(f'    ✓ Stable asset quality with {ci_w} ', False, dark_navy),
                ('Limit', True, red_clr),
-               (f" {'breach' if ci_red == 1 else 'breach'}", False, dark_navy)]
+               (f" {'breach' if ci_red == 1 else 'breaches'}", False, dark_navy)]
 
     specs = [
         [(f"{quarter} Credit Risk Metrics", True, black_clr, 20.0)],
-        [(t, b, c, 11.0) for t, b, c in p1_runs],
-        [('• LOB Level 2 and 3 Asset Quality: ', True, dark_navy, 11.0),
-         ('Majority ', False, dark_navy, 11.0),
-         ('Below Risk Appetite Limits', True, green_clr, 11.0)],
-        [(t, b, c, 11.0) for t, b, c in p3_runs],
-        [('• Commercial Industry Level 2 and 3 Concentration: ', True, dark_navy, 11.0),
-         ('Majority ', False, dark_navy, 11.0),
-         ('Within Risk Appetite Limits', True, green_clr, 11.0)],
-        [('    ✓ Portfolio growth and declining CET1 resulted in a stable number of metrics exceeding ', False, dark_navy, 11.0),
-         ('Warning', True, amber_clr, 11.0),
-         (' level', False, dark_navy, 11.0)],
-        [('• Commercial Industry Level 2 and 3 Asset Quality: ', True, dark_navy, 11.0),
-         ('Majority ', False, dark_navy, 11.0),
-         ('Within Risk Appetite Limits', True, green_clr, 11.0)],
-        [(t, b, c, 11.0) for t, b, c in p7_runs]
+        [(t, b, c, 12.0) for t, b, c in p1_runs],
+        [('• LOB Level 2 and 3 Asset Quality: ', True, dark_navy, 12.0),
+         ('Majority ', False, dark_navy, 12.0),
+         ('Below Risk Appetite Limits', True, green_clr, 12.0)],
+        [(t, b, c, 12.0) for t, b, c in p3_runs],
+        [('• Commercial Industry Level 2 and 3 Concentration: ', True, dark_navy, 12.0),
+         ('Majority ', False, dark_navy, 12.0),
+         ('Within Risk Appetite Limits', True, green_clr, 12.0)],
+        [('    ✓ Portfolio growth and declining CET1 resulted in a stable number of metrics exceeding ', False, dark_navy, 12.0),
+         ('Warning', True, amber_clr, 12.0),
+         (' level', False, dark_navy, 12.0)],
+        [('• Commercial Industry Level 2 and 3 Asset Quality: ', True, dark_navy, 12.0),
+         ('Majority ', False, dark_navy, 12.0),
+         ('Within Risk Appetite Limits', True, green_clr, 12.0)],
+        [(t, b, c, 12.0) for t, b, c in p7_runs]
     ]
 
     while len(tf.paragraphs) < len(specs):
         tf.add_paragraph()
+
+    bu_none_xml = '<a:buNone xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>'
     for p_idx, run_specs in enumerate(specs):
         p = tf.paragraphs[p_idx]
         p.text = ""
         p.space_before = Pt(0)
-        p.space_after = Pt(3) if p_idx == 0 else Pt(2)
+        p.space_after = Pt(1.5) if p_idx == 0 else Pt(1.0)
+        p.line_spacing = Pt(12.5) if p_idx > 0 else Pt(20.0)
+        
+        # Enforce buNone in pPr so layout does not generate duplicate bullet
+        pPr = p._p.get_or_add_pPr()
+        for child in list(pPr):
+            if any(child.tag.endswith(x) for x in ['buChar', 'buAutoNum', 'buBlip', 'buNone']):
+                pPr.remove(child)
+        pPr.append(parse_xml(bu_none_xml))
+
         for text, bold, color, size in run_specs:
             r = p.add_run()
             r.text = text
@@ -1117,6 +1136,9 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
 
     # 2. Update existing top-right summary table
     summary_shape = update_slide2_summary_table(slide, report, main_table_shape_id=table._graphic_frame.shape_id)
+    if summary_shape:
+        summary_shape.top = Inches(0.14)
+        summary_shape.left = Inches(8.6167)
 
     # Clean styling on summary table: white data cells, subtle bottom divider, clean alignment
     if summary_shape:
@@ -1143,19 +1165,32 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                     for p in s_cell.text_frame.paragraphs:
                         p.alignment = PP_ALIGN.CENTER
                         p.font.name = "Arial"
-                        p.font.size = Pt(8.5)
+                        p.font.size = Pt(8.0)
                         p.font.bold = True
                         p.font.color.rgb = RGBColor(255, 255, 255) if s_c == 7 else RGBColor(0, 0, 0)
+                        for r in p.runs:
+                            r.font.name = "Arial"
+                            r.font.size = Pt(8.0)
+                            r.font.bold = True
                 else:
-                    # Data cells: L-shape soft grey on Total row and Total col
-                    is_tot = (s_r == 5)
+                    # Data cells: font size 8.0, bold srif latest quarter ke column numbers hai is me.
+                    # Col 0: Level labels (Bold), Col 7: Total (Bold)
+                    # Col 1, 3, 5: Previous Quarter numbers (NOT Bold)
+                    # Col 2, 4, 6: Latest Quarter numbers (Bold)
+                    is_prev_q = (s_c in (1, 3, 5))
+                    cell_bold = not is_prev_q
 
                     for p in s_cell.text_frame.paragraphs:
                         p.alignment = PP_ALIGN.RIGHT if s_c == 0 else PP_ALIGN.CENTER
                         p.font.name = "Arial"
-                        p.font.size = Pt(8.5)
-                        p.font.bold = is_tot or (s_c == 0)
+                        p.font.size = Pt(8.0)
+                        p.font.bold = cell_bold
                         p.font.color.rgb = RGBColor(0, 0, 0)
+                        for r in p.runs:
+                            r.font.name = "Arial"
+                            r.font.size = Pt(8.0)
+                            r.font.bold = cell_bold
+                            r.font.color.rgb = RGBColor(0, 0, 0)
 
     # 3. Enforce exact column widths and geometry matching Ideal_slide_ppt.pptx:
     ideal_col_widths = [1.584, 0.7093, 1.3256, 1.6987, 1.8023, 2.2985, 3.4338]
@@ -1164,7 +1199,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(2.24)
+    table._graphic_frame.top = Inches(1.84)
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
@@ -1172,7 +1207,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     red_color = RGBColor(193, 0, 27)        # #C1001B exact KeyBank corporate red
     navy_color = RGBColor(35, 41, 54)      # #232936 exact presentation dark navy
 
-    # Header Row 0: Center horizontally and vertically
+    # Header Row 0: Center horizontally and vertically (10.0pt Bold)
     for c_i in range(len(table.columns)):
         h_cell = table.cell(0, c_i)
         if not h_cell.is_spanned:
@@ -1180,16 +1215,20 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             for p in h_cell.text_frame.paragraphs:
                 p.alignment = PP_ALIGN.CENTER
                 p.font.name = "Arial"
-                p.font.size = Pt(9.5)
+                p.font.size = Pt(10.0)
                 p.font.bold = True
                 p.font.color.rgb = RGBColor(255, 255, 255) if c_i < 3 else navy_color
+                for r in p.runs:
+                    r.font.name = "Arial"
+                    r.font.size = Pt(10.0)
+                    r.font.bold = True
 
     # Data Rows 1 to 8: Executive category dividing borders and soft alternating fills
     for r_idx in range(1, len(table.rows)):
         is_cat_bottom = r_idx in (2, 4, 8)
         border_hex = '000000' if is_cat_bottom else None
         border_pt = 1.5 if is_cat_bottom else 0
-        row_grey = r_idx in (2, 4, 8)
+        row_grey = (r_idx % 2 == 0)
 
         for c_idx in range(len(table.columns)):
             cell = table.cell(r_idx, c_idx)
@@ -1197,6 +1236,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                 continue
 
             c_fill = None if (c_idx == 0 or not row_grey) else 'F6F7F9'
+            # Divider lines are required across all columns including Column 0 ('Credit Risk Metrics')
             set_cell_border_and_fill(cell, fill_hex=c_fill, bottom_border_hex=border_hex, bottom_border_pt=border_pt)
 
             cell.margin_top = Inches(0.002)
@@ -1209,20 +1249,18 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                 for p in cell.text_frame.paragraphs:
                     p.alignment = PP_ALIGN.CENTER if c_idx == 1 else PP_ALIGN.LEFT
                     p.font.name = "Arial"
-                    p.font.size = Pt(9.0)
+                    p.font.size = Pt(10.0)
                     p.font.bold = True
                     p.font.color.rgb = navy_color
                     for run in p.runs:
                         run.font.name = "Arial"
-                        run.font.size = Pt(9.0)
+                        run.font.size = Pt(10.0)
                         run.font.bold = True
                         run.font.color.rgb = navy_color
 
             elif c_idx in (4, 5, 6):
-                # Adaptive bullet font size: 8.0pt for dense rows, 8.3pt for normal
-                n_items = len(cell.text_frame.paragraphs)
-                m_font_pt = 8.0 if n_items >= 6 else 8.3
-                ln_spc = Pt(9.8) if m_font_pt == 8.0 else Pt(10.2)
+                m_font_pt = 10.0
+                ln_spc = Pt(11.8)
 
                 for p_idx, para in enumerate(cell.text_frame.paragraphs):
                     para.space_before = Pt(0)
@@ -1239,20 +1277,47 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                         run.font.bold = p_bold
                         run.font.color.rgb = p_color
 
-    # Ensure Category dividing borders extend to ALL columns (including merged and spanned cells)
-    w_emu = int(1.5 * 12700)
-    for cat_bottom_r in (2, 4, 8):
-        for c_idx in range(len(table.columns)):
-            tcPr = table.cell(cat_bottom_r, c_idx)._tc.get_or_add_tcPr()
-            for el in list(tcPr):
-                if el.tag.endswith('lnB'):
-                    tcPr.remove(el)
-            lnB = parse_xml(f'<a:lnB xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="{w_emu}" cmpd="sng"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:lnB>')
-            first_fill = next((el for el in list(tcPr) if any(el.tag.endswith(x) for x in ['solidFill', 'noFill', 'gradFill', 'blipFill'])), None)
-            if first_fill is not None:
-                first_fill.addprevious(lnB)
-            else:
-                tcPr.append(lnB)
+    # Enforce Double-Sided Pure Black Dividing Lines at Row 2, Row 4, Row 8
+    w_emu = int(1.5 * 12700) # 1.5pt solid pure black
+    def _add_line(cell, border_tag):
+        tcPr = cell._tc.get_or_add_tcPr()
+        for el in list(tcPr):
+            if el.tag.endswith(border_tag):
+                tcPr.remove(el)
+        ln = parse_xml(f'<a:{border_tag} xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w="{w_emu}" cmpd="sng"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:{border_tag}>')
+        first_fill = next((el for el in list(tcPr) if any(el.tag.endswith(x) for x in ['solidFill', 'noFill', 'gradFill', 'blipFill'])), None)
+        if first_fill is not None:
+            first_fill.addprevious(ln)
+        else:
+            tcPr.append(ln)
+
+    # 100% Complete, full-width solid pure black dividing lines across ALL columns (0 to 6):
+    for c_i in range(len(table.columns)):
+        # Category 1: Row 2 bottom & Row 3 top
+        _add_line(table.cell(2, c_i), 'lnB')
+        if len(table.rows) > 3:
+            _add_line(table.cell(3, c_i), 'lnT')
+        # Category 2: Row 4 bottom & Row 5 top
+        if len(table.rows) > 4:
+            _add_line(table.cell(4, c_i), 'lnB')
+        if len(table.rows) > 5:
+            _add_line(table.cell(5, c_i), 'lnT')
+        # Category 3: Row 8 bottom
+        if len(table.rows) > 8:
+            _add_line(table.cell(8, c_i), 'lnB')
+
+    # Enforce Column 0 vertically merged cells specifically so line is 100% full & complete from left edge:
+    # Category 1: Total KeyCorp (R1C0 primary rowSpan=2, R2C0 vMerge=1)
+    _add_line(table.cell(1, 0), 'lnB')
+    _add_line(table.cell(2, 0), 'lnB')
+    _add_line(table.cell(3, 0), 'lnT')
+    # Category 2: Line of Business (R3C0 primary rowSpan=2, R4C0 vMerge=1)
+    _add_line(table.cell(3, 0), 'lnB')
+    _add_line(table.cell(4, 0), 'lnB')
+    _add_line(table.cell(5, 0), 'lnT')
+    # Category 3: Commercial Industry (R5C0 primary rowSpan=4, R8C0 vMerge=1)
+    _add_line(table.cell(5, 0), 'lnB')
+    _add_line(table.cell(8, 0), 'lnB')
 
     # 5. Row heights matching Ideal_slide_ppt.pptx exactly:
     row_heights = [0.4248, 0.3192, 0.3192, 0.3192, 1.0578, 0.6731, 0.3192, 0.8038, 0.4621]
@@ -1261,34 +1326,60 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.rows[i].height = Inches(h)
     table._graphic_frame.height = Inches(sum(r.height for r in table.rows) / Inches(1))
 
-    # 6. Ensure Footer Notes & Slide Number matching ppt.pptx exactly
-    has_confidential = any(s.has_text_frame and 'classification: confidential' in s.text_frame.text.lower() for s in slide.shapes)
+    # 6. Ensure Footer Notes, Logo & Slide Number matching ppt.pptx exactly and positioned cleanly at the bottom
+    for s in slide.shapes:
+        if s.has_text_frame and "classification: confidential" in s.text_frame.text.lower():
+            s.top = Inches(7.12)
+            s.left = Inches(1.50)
+            s.width = Inches(10.30)
+            s.height = Inches(0.38)
+            s.text_frame.margin_top = s.text_frame.margin_bottom = s.text_frame.margin_left = s.text_frame.margin_right = 0
+            for p_idx, p in enumerate(s.text_frame.paragraphs):
+                p.space_before = Pt(0)
+                p.space_after = Pt(0)
+                # Big table ke niche jo text tilted ha wo bold ha
+                if p_idx < 2:
+                    p.font.name = "Arial"
+                    p.font.size = Pt(8.0)
+                    p.font.bold = True
+                    p.font.italic = True
+                    for r in p.runs:
+                        r.font.name = "Arial"
+                        r.font.size = Pt(8.0)
+                        r.font.bold = True
+                        r.font.italic = True
+        elif s.has_text_frame and s.text_frame.text.strip() == "2":
+            s.top = Inches(7.14)
+            s.left = Inches(12.75)
+        elif s.shape_type == MSO_SHAPE_TYPE.PICTURE and s.top > Inches(6.5):
+            s.top = Inches(7.12)
+            s.left = Inches(0.40)
+
+    has_confidential = any(s.has_text_frame and "classification: confidential" in s.text_frame.text.lower() for s in slide.shapes)
     if not has_confidential:
-        tb_f = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top > Inches(6.8)), None)
-        if not tb_f:
-            tb_f = slide.shapes.add_textbox(Inches(1.5), Inches(6.98), Inches(10.3), Inches(0.45))
+        tb_f = slide.shapes.add_textbox(Inches(1.50), Inches(7.08), Inches(10.30), Inches(0.38))
         tff = tb_f.text_frame
         tff.word_wrap = True
         tff.margin_left = tff.margin_right = tff.margin_top = tff.margin_bottom = 0
         tff.clear()
         pf0 = tff.paragraphs[0]
         pf0.text = "Supporting information on metrics exceeding Risk Appetite Warning and in breach Risk Appetite Limit at the end of the deck"
-        pf0.font.name = "Arial"; pf0.font.size = Pt(8.0); pf0.font.bold = False; pf0.font.italic = True; pf0.font.color.rgb = RGBColor(0, 0, 0)
-        pf0.alignment = PP_ALIGN.CENTER; pf0.space_after = Pt(0)
+        pf0.font.name = "Arial"; pf0.font.size = Pt(8.0); pf0.font.bold = True; pf0.font.italic = True; pf0.font.color.rgb = RGBColor(0, 0, 0)
+        pf0.alignment = PP_ALIGN.CENTER; pf0.space_after = Pt(0); pf0.space_before = Pt(0)
 
         pf1 = tff.add_paragraph()
         pf1.text = "Note: Comparisons above reflect current ERM and Credit risk metric framework. For prior period breaches refer to historic Credit Risk Metric reports"
-        pf1.font.name = "Arial"; pf1.font.size = Pt(8.0); pf1.font.bold = False; pf1.font.italic = True; pf1.font.color.rgb = RGBColor(0, 0, 0)
-        pf1.alignment = PP_ALIGN.CENTER; pf1.space_after = Pt(0)
+        pf1.font.name = "Arial"; pf1.font.size = Pt(8.0); pf1.font.bold = True; pf1.font.italic = True; pf1.font.color.rgb = RGBColor(0, 0, 0)
+        pf1.alignment = PP_ALIGN.CENTER; pf1.space_after = Pt(0); pf1.space_before = Pt(0)
 
         pf2 = tff.add_paragraph()
         pf2.text = "CLASSIFICATION: CONFIDENTIAL"
         pf2.font.name = "Arial"; pf2.font.size = Pt(7.5); pf2.font.bold = False; pf2.font.italic = False; pf2.font.color.rgb = RGBColor(0, 0, 0)
-        pf2.alignment = PP_ALIGN.CENTER
+        pf2.alignment = PP_ALIGN.CENTER; pf2.space_after = Pt(0); pf2.space_before = Pt(0)
 
     has_num = any(s.has_text_frame and s.text_frame.text.strip() == "2" for s in slide.shapes)
     if not has_num:
-        tb_num = slide.shapes.add_textbox(Inches(12.75), Inches(7.02), Inches(0.4), Inches(0.3))
+        tb_num = slide.shapes.add_textbox(Inches(12.75), Inches(7.10), Inches(0.4), Inches(0.3))
         p_num = tb_num.text_frame.paragraphs[0]
         p_num.text = "2"
         p_num.font.name = "Arial"; p_num.font.size = Pt(9.0); p_num.font.color.rgb = RGBColor(0, 0, 0)
@@ -1322,17 +1413,9 @@ def copy_slide_from_template_com(template_path, source_path, output_path, slide_
     if not os.path.isfile(s_abs):
         raise FileNotFoundError(f"Source PPTX not found: {s_abs}")
         
-    if s_abs != o_abs:
-        shutil.copy2(s_abs, o_abs)
+    shutil.copy2(s_abs, o_abs)
     
-    try:
-        ppt_app = win32com.client.DispatchEx("PowerPoint.Application")
-    except Exception:
-        ppt_app = win32com.client.Dispatch("PowerPoint.Application")
-    try:
-        ppt_app.DisplayAlerts = 1
-    except Exception:
-        pass
+    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
     pres = None
     try:
         pres = ppt_app.Presentations.Open(o_abs, WithWindow=False)
