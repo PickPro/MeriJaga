@@ -16,6 +16,7 @@ import math
 import os
 import re
 import sys
+import uuid
 from pathlib import Path
 
 from pptx import Presentation
@@ -1437,9 +1438,57 @@ def copy_slide_from_template_com(template_path, source_path, output_path, slide_
     return o_abs
 
 
+def create_standalone_deck(output, audit, single_slide=False):
+    """Build a complete, standalone, self-contained Credit Risk Executive PPTX from scratch
+    without needing any template PPTX file.
+    If single_slide is True: Slide 1 is the Credit Risk Slide.
+    If single_slide is False (default): Slide 1 is Executive Cover, Slide 2 is the Credit Risk Slide.
+    """
+    output = Path(output).resolve()
+    report = audit if isinstance(audit, dict) else json.loads(Path(audit).read_text(encoding='utf-8'))
+    validate_report(report)
+    quarter = report.get('quarter', '3Q26')
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333333)
+    prs.slide_height = Inches(7.5)
+
+    if single_slide:
+        prs.slides.add_slide(prs.slide_layouts[6])
+    else:
+        # Slide 1: Executive Cover
+        s1 = prs.slides.add_slide(prs.slide_layouts[6])
+        tb1 = s1.shapes.add_textbox(Inches(1.2), Inches(2.8), Inches(11.0), Inches(2.0))
+        tf1 = tb1.text_frame
+        p1 = tf1.paragraphs[0]
+        p1.text = f"{quarter} Credit Risk Metrics Report"
+        p1.font.name = "Arial"; p1.font.size = Pt(36); p1.font.bold = True; p1.font.color.rgb = RGBColor(35, 41, 54)
+        p1_sub = tf1.add_paragraph()
+        p1_sub.text = "Enterprise Risk Management & Credit Risk Administration"
+        p1_sub.font.name = "Arial"; p1_sub.font.size = Pt(18); p1_sub.font.color.rgb = RGBColor(112, 128, 144)
+
+        # Slide 2: Target Slide
+        prs.slides.add_slide(prs.slide_layouts[6])
+
+    temp_blank = output.with_name(f"temp_blank_{os.getpid()}_{uuid.uuid4().hex[:6]}.pptx")
+    prs.save(str(temp_blank))
+
+    try:
+        res = patch_pptx(str(temp_blank), str(output), audit, same_slide=True, dry_run=False)
+    finally:
+        if temp_blank.exists():
+            try:
+                temp_blank.unlink()
+            except Exception:
+                pass
+    return res
+
+
 def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=False,
                new_table_slide=False, include_count_slide=False,
                same_slide=False, count_reference_pptx=None):
+    if source is None or str(source).lower() in ('none', 'standalone', ''):
+        return create_standalone_deck(output, audit)
     source = Path(source).resolve(); output = Path(output).resolve()
     if not source.is_file():
         raise ValueError(f'Original PPTX not found: {source}')
@@ -1587,7 +1636,8 @@ def patch_pptx(source, output, audit, dry_run=False, allow_possible_overflow=Fal
 
 def main():
     p = argparse.ArgumentParser(description='Patch the original native PPT table with single or dedicated slide layout')
-    p.add_argument('--pptx', required=True, help='Original CRM Report Slides for BOT.pptx')
+    p.add_argument('--pptx', default=None, help='Original CRM Report Slides for BOT.pptx (optional in standalone mode)')
+    p.add_argument('--standalone', action='store_true', help='Generate standalone executive deck without template')
     p.add_argument('--audit', required=True, help='Verified 2Q26 or 3Q26 .audit.json from generator')
     p.add_argument('--output', required=True, help='New output PPTX; original will not be overwritten')
     p.add_argument('--dry-run', action='store_true')
@@ -1596,9 +1646,12 @@ def main():
     p.add_argument('--same-slide', action='store_true', help='Keep count summary and detailed table on existing Slide 2')
     p.add_argument('--count-reference-pptx', help='Optional path to Final_Deck_3Q26_Native_Updated.pptx for compact table design')
     a = p.parse_args()
-    result = patch_pptx(a.pptx, a.output, a.audit, a.dry_run, a.allow_possible_overflow,
-                        new_table_slide=a.new_table_slide, same_slide=a.same_slide,
-                        count_reference_pptx=a.count_reference_pptx)
+    if a.standalone or not a.pptx:
+        result = create_standalone_deck(a.output, a.audit)
+    else:
+        result = patch_pptx(a.pptx, a.output, a.audit, a.dry_run, a.allow_possible_overflow,
+                            new_table_slide=a.new_table_slide, same_slide=a.same_slide,
+                            count_reference_pptx=a.count_reference_pptx)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
