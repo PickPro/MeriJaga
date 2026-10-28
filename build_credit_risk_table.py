@@ -732,7 +732,8 @@ def write_count_summary_workbook(report, dest):
 
 def main():
     p = argparse.ArgumentParser(description="Generate the single PPTX Credit Risk table")
-    p.add_argument("--excel", required=True, help="Input workbook .xlsx")
+    p.add_argument("files", nargs="*", help="Optional files in sequence: [master_excel] [latest_excel] [template_pptx] [output_pptx] OR [final_deck] [output_pptx]")
+    p.add_argument("--excel", default=None, help="Input workbook .xlsx")
     p.add_argument("--quarter", default="3Q26", help="Reporting quarter: 2Q26 or 3Q26 (default: 3Q26)")
     p.add_argument("--status-csv", help="Optional verified CSV with Metric ID and quarter/status")
     p.add_argument("--latest-period-excel", help="Latest_Period_Metrics.xlsx: actual values in D/E/F (Green/Yellow/Red), matching B Filename to original B DownloadCrosstab")
@@ -748,7 +749,50 @@ def main():
     p.add_argument("--same-slide", action="store_true", help="Keep count summary and detailed table on existing Slide 2 without adding extra slides")
     p.add_argument("--count-reference-pptx", help="Path to Final_Deck_3Q26_Native_Updated.pptx for copying/replicating exact compact mini-table design")
     p.add_argument("--draft", action="store_true", help="Produce a visibly marked incomplete DRAFT PPTX when some quarter statuses are unknown; requires --template-pptx")
-    args = p.parse_args()
+    args, unknown = p.parse_known_args()
+    unk_flags = [x for x in unknown if x.startswith("-")]
+    if unk_flags:
+        p.error(f"unrecognized arguments: {' '.join(unk_flags)}")
+    args.files.extend([x for x in unknown if not x.startswith("-")])
+
+    # Intelligent auto-mapping for sequential/positional files:
+    if args.files:
+        excel_files = [f for f in args.files if f.lower().endswith((".xlsx", ".xlsm", ".xls"))]
+        pptx_files = [f for f in args.files if f.lower().endswith((".pptx", ".ppt"))]
+
+        if not args.excel and len(excel_files) >= 1:
+            args.excel = excel_files[0]
+        if not args.latest_period_excel and len(excel_files) >= 2:
+            args.latest_period_excel = excel_files[1]
+
+        if pptx_files:
+            if not args.template_pptx:
+                args.template_pptx = pptx_files[0]
+                remaining_pptx = pptx_files[1:]
+            else:
+                remaining_pptx = pptx_files
+
+            if len(remaining_pptx) == 1:
+                if not args.output:
+                    args.output = remaining_pptx[0]
+            elif len(remaining_pptx) >= 2:
+                if not args.target_deck:
+                    args.target_deck = remaining_pptx[0]
+                    if not args.output:
+                        args.output = remaining_pptx[1]
+                else:
+                    if not args.output:
+                        args.output = remaining_pptx[-1]
+
+        # Automatically apply standard Slide 2 production flags if positional files are used
+        if not args.preview and not args.new_table_slide:
+            args.same_slide = True
+            args.include_count_summary = True
+            args.draft = True
+
+    if not args.excel:
+        p.error("--excel is required (or supply Master Excel as 1st positional argument)")
+
     if args.draft and not args.template_pptx:
         p.error("--draft requires --template-pptx (the original PowerPoint)")
     if args.draft and args.preview:
