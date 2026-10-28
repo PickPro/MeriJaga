@@ -1001,106 +1001,87 @@ def set_cell_border_and_fill(cell, fill_hex=None, bottom_border_hex='D0D4DC', bo
 
 
 def update_slide2_title_and_commentary(slide, report):
-    """Update Slide 2 Title and Commentary matching ppt.pptx Section 3 exact forensic inspection."""
+    """Update Slide 2 Title and Commentary matching official BOT deck exact 11pt typography & colors."""
     quarter = report.get('quarter', '3Q26')
-    tb_shape = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top < Inches(2.0)), None)
-    if not tb_shape:
-        return False
-    tf = tb_shape.text_frame
+    tb = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top < Inches(2.2)), None)
+    if not tb: return False
+    tf = tb.text_frame
     tf.word_wrap = True
 
-    dark_navy = RGBColor(35, 41, 54)       # #232936 Exact Presentation Dark Navy
-    green_clr = RGBColor(112, 173, 71)     # #70AD47 Exact Presentation Accent Green
-    amber_clr = RGBColor(242, 174, 0)      # #F2AE00 Exact Presentation Warm Amber/Gold
-    red_clr = RGBColor(193, 0, 27)         # #C1001B Exact KeyBank Pure Corporate Red
+    dark_navy = RGBColor(35, 41, 54)     # #232936
+    green_clr = RGBColor(112, 173, 71)   # #70AD47
+    amber_clr = RGBColor(242, 174, 0)    # #F2AE00
+    red_clr = RGBColor(193, 0, 27)       # #C1001B
+    black_clr = RGBColor(0, 0, 0)
 
-    # 1. Title
-    for p in tf.paragraphs:
-        if 'credit risk metrics' in p.text.lower():
-            p.text = ""
-            r = p.add_run()
-            r.text = f"{quarter} Credit Risk Metrics"
-            r.font.bold = True
-            r.font.size = Pt(20)
-            r.font.name = "Arial"
-            r.font.color.rgb = RGBColor(0, 0, 0)
-            p.space_after = Pt(3)
-            break
+    num_words = {0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten'}
+    rows = report.get('rows', [])
 
-    # 2. Level 1 summary status
-    row0 = report['rows'][0] if report.get('rows') else None
-    if row0:
-        y_items = [clean_metric_display_name(x['name'], 1) for x in row0.get('yellow', [])]
-        r_items = [clean_metric_display_name(x['name'], 1) for x in row0.get('red', [])]
-        total_breaches = len(y_items) + len(r_items)
-        if total_breaches == 0:
-            l1_status_text = "All Below Risk Appetite Limits"
-        else:
-            all_breaches = y_items + r_items
-            joined_str = ', '.join(all_breaches)
-            l1_status_text = f"{total_breaches} Exceeds Warning ({joined_str})"
+    # Row 0: L1 Asset Quality
+    row0 = rows[0] if len(rows) > 0 else {}
+    y0 = [clean_metric_display_name(x['name'], 1) for x in row0.get('yellow', [])]
+    r0 = [clean_metric_display_name(x['name'], 1) for x in row0.get('red', [])]
+    tot0 = len(y0) + len(r0)
+    if tot0 == 0:
+        p1_runs = [('• Total KeyCorp Level 1 Asset Quality and Concentration: ', True, dark_navy),
+                   ('All Below Risk Appetite Limits', True, green_clr)]
     else:
-        l1_status_text = "1 Exceeds Warning (KeyCorp Criticized %)"
+        joined = ', '.join(y0 + r0)
+        p1_runs = [('• Total KeyCorp Level 1 Asset Quality: ', True, dark_navy),
+                   (f'{tot0} Exceeds Warning ({joined})', False, dark_navy)]
 
-    # Commentary paragraphs specs matching ppt.pptx Section 3 exact forensic inspection
-    # Note: P1 status is NORMAL weight default color (matching official deck)
-    commentary_specs = [
-        ("Total KeyCorp Level 1 Asset Quality", [
-            ("• Total KeyCorp Level 1 Asset Quality: ", True, dark_navy),
-            (l1_status_text, False, dark_navy)
-        ]),
-        ("LOB Level 2 and 3 Asset Quality", [
-            ("• LOB Level 2 and 3 Asset Quality: ", True, dark_navy),
-            ("Majority ", False, dark_navy),
-            ("Below Risk Appetite Limits", True, green_clr)
-        ]),
-        ("Stable asset quality with six", [
-            ("    ✓ Stable asset quality with six ", False, dark_navy),
-            ("Limit", True, red_clr),
-            (" breaches", False, dark_navy)
-        ]),
-        ("Commercial Industry Level 2 and 3 Concentration", [
-            ("• Commercial Industry Level 2 and 3 Concentration: ", True, dark_navy),
-            ("Majority ", False, dark_navy),
-            ("Within Risk Appetite Limits", True, green_clr)
-        ]),
-        ("declining CET1 resulted", [
-            ("    ✓ Portfolio growth and declining CET1 resulted in a stable number of metrics exceeding ", False, dark_navy),
-            ("Warning", True, amber_clr),
-            (" level", False, dark_navy)
-        ]),
-        ("Commercial Industry Level 2 and 3 Asset Quality", [
-            ("• Commercial Industry Level 2 and 3 Asset Quality: ", True, dark_navy),
-            ("Majority ", False, dark_navy),
-            ("Within Risk Appetite Limits", True, green_clr)
-        ]),
-        ("Stable asset quality with two", [
-            ("    ✓ Stable asset quality with two ", False, dark_navy),
-            ("Limit", True, red_clr),
-            (" breach", False, dark_navy)
-        ]),
+    # Rows 2 & 3: LOB breaches
+    row2 = rows[2] if len(rows) > 2 else {}
+    row3 = rows[3] if len(rows) > 3 else {}
+    lob_red = len(row2.get('red', [])) + len(row3.get('red', []))
+    lob_w = num_words.get(lob_red, str(lob_red))
+    p3_runs = [(f'    ✓ Stable asset quality with {lob_w} ', False, dark_navy),
+               ('Limit', True, red_clr),
+               (f" {'breach' if lob_red == 1 else 'breaches'}", False, dark_navy)]
+
+    # Rows 6 & 7: Commercial Industry breaches
+    row6 = rows[6] if len(rows) > 6 else {}
+    row7 = rows[7] if len(rows) > 7 else {}
+    ci_red = len(row6.get('red', [])) + len(row7.get('red', []))
+    ci_w = num_words.get(ci_red, str(ci_red))
+    p7_runs = [(f'    ✓ Stable asset quality with {ci_w} ', False, dark_navy),
+               ('Limit', True, red_clr),
+               (f" {'breach' if ci_red == 1 else 'breach'}", False, dark_navy)]
+
+    specs = [
+        [(f"{quarter} Credit Risk Metrics", True, black_clr, 20.0)],
+        [(t, b, c, 11.0) for t, b, c in p1_runs],
+        [('• LOB Level 2 and 3 Asset Quality: ', True, dark_navy, 11.0),
+         ('Majority ', False, dark_navy, 11.0),
+         ('Below Risk Appetite Limits', True, green_clr, 11.0)],
+        [(t, b, c, 11.0) for t, b, c in p3_runs],
+        [('• Commercial Industry Level 2 and 3 Concentration: ', True, dark_navy, 11.0),
+         ('Majority ', False, dark_navy, 11.0),
+         ('Within Risk Appetite Limits', True, green_clr, 11.0)],
+        [('    ✓ Portfolio growth and declining CET1 resulted in a stable number of metrics exceeding ', False, dark_navy, 11.0),
+         ('Warning', True, amber_clr, 11.0),
+         (' level', False, dark_navy, 11.0)],
+        [('• Commercial Industry Level 2 and 3 Asset Quality: ', True, dark_navy, 11.0),
+         ('Majority ', False, dark_navy, 11.0),
+         ('Within Risk Appetite Limits', True, green_clr, 11.0)],
+        [(t, b, c, 11.0) for t, b, c in p7_runs]
     ]
 
-    for pat, runs_spec in commentary_specs:
-        target_p = None
-        for p in tf.paragraphs:
-            if pat.lower() in p.text.lower():
-                target_p = p
-                break
-        if target_p is not None:
-            target_p.text = ""
-            target_p.space_before = Pt(0)
-            target_p.space_after = Pt(2)
-            for r_text, r_bold, r_color in runs_spec:
-                run = target_p.add_run()
-                run.text = r_text
-                run.font.name = "Arial"
-                run.font.size = Pt(11.0)
-                run.font.bold = r_bold
-                run.font.color.rgb = r_color
-
+    while len(tf.paragraphs) < len(specs):
+        tf.add_paragraph()
+    for p_idx, run_specs in enumerate(specs):
+        p = tf.paragraphs[p_idx]
+        p.text = ""
+        p.space_before = Pt(0)
+        p.space_after = Pt(3) if p_idx == 0 else Pt(2)
+        for text, bold, color, size in run_specs:
+            r = p.add_run()
+            r.text = text
+            r.font.name = "Arial"
+            r.font.size = Pt(size)
+            r.font.bold = bold
+            r.font.color.rgb = color
     return True
-
 
 
 def ensure_slide_text_arial(slide):
@@ -1168,12 +1149,6 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
                 else:
                     # Data cells: L-shape soft grey on Total row and Total col
                     is_tot = (s_r == 5)
-                    if s_c > 0 and (s_r == 5 or s_c == 7):
-                        set_cell_border_and_fill(s_cell, fill_hex='F6F7F9', bottom_border_hex=None, bottom_border_pt=0)
-                    elif s_c == 0:
-                        set_cell_border_and_fill(s_cell, fill_hex=None, bottom_border_hex=None, bottom_border_pt=0)
-                    else:
-                        set_cell_border_and_fill(s_cell, fill_hex='FFFFFF', bottom_border_hex=None, bottom_border_pt=0)
 
                     for p in s_cell.text_frame.paragraphs:
                         p.alignment = PP_ALIGN.RIGHT if s_c == 0 else PP_ALIGN.CENTER
