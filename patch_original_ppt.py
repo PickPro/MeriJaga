@@ -64,7 +64,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
     prior_quarter = get_prior_quarter(quarter)
 
     # 1. Title & Commentary Text Frame (Left=0.40", Top=0.35", Width=8.2", Height=1.85")
-    tb_shape = slide.shapes.add_textbox(Inches(0.40), Inches(0.08), Inches(8.2), Inches(1.75))
+    tb_shape = slide.shapes.add_textbox(Inches(0.40), Inches(0.11), Inches(8.2), Inches(1.75))
     tf = tb_shape.text_frame
     tf.word_wrap = True
     tf.margin_left = tf.margin_top = tf.margin_right = tf.margin_bottom = 0
@@ -120,7 +120,7 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
 
     # 2. Top-Right Summary Counts Table (6 rows x 8 cols)
     # Exact geometry from template inspection: Left=8.6167", Top=0.345", Width=4.6", Height=1.45"
-    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.08), Inches(4.6), Inches(1.45))
+    summary_shape = slide.shapes.add_table(6, 8, Inches(8.6167), Inches(0.10), Inches(4.6), Inches(1.45))
     s_tbl = summary_shape.table
     try:
         s_tbl._tbl.tblPr.set('bandRow', '0')
@@ -207,14 +207,12 @@ def setup_empty_slide_for_credit_risk(slide, report, prs=None):
 
     # 3. Main Detailed Table (9x7)
     # Exact geometry from template inspection: Left=0.2406", Top=2.24", Width=12.8521", Height=4.535"
-    t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(1.82), Inches(12.8521), Inches(4.535))
+    t_shape = slide.shapes.add_table(9, 7, Inches(0.2406), Inches(1.85), Inches(12.8521), Inches(4.535))
     table = t_shape.table
     try:
         table._tbl.tblPr.set('bandRow', '0')
         table._tbl.tblPr.set('firstRow', '0')
-        tblStyleId = table._tbl.tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}tableStyleId')
-        if tblStyleId is not None:
-            tblStyleId.text = '{21E4AEA4-8DFA-4A89-80CE-4F4B0632609B}'
+        
     except Exception:
         pass
 
@@ -1016,7 +1014,7 @@ def update_slide2_title_and_commentary(slide, report):
     tb = next((s for s in slide.shapes if s.has_text_frame and not s.has_table and s.top < Inches(2.2)), None)
     if not tb: return False
     # Move Title & Commentary text frame UP to give room for the table
-    tb.top = Inches(0.08)
+    tb.top = Inches(0.10)
     tb.left = Inches(0.40)
     tb.width = Inches(8.20)
     tb.text_frame.margin_top = Inches(0.0)
@@ -1147,7 +1145,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
     # 2. Update existing top-right summary table
     summary_shape = update_slide2_summary_table(slide, report, main_table_shape_id=table._graphic_frame.shape_id)
     if summary_shape:
-        summary_shape.top = Inches(0.08)
+        summary_shape.top = Inches(0.10)
         summary_shape.left = Inches(8.6167)
 
     # Clean styling on summary table: white data cells, subtle bottom divider, clean alignment
@@ -1209,7 +1207,7 @@ def apply_same_slide_layout(slide, table, planned, report, count_reference_pptx=
             table.columns[i].width = Inches(w)
 
     table._graphic_frame.left = Inches(0.2406)
-    table._graphic_frame.top = Inches(1.6)
+    table._graphic_frame.top = Inches(1.7)
     table._graphic_frame.width = Inches(12.8521)
 
     # 4. Format ALL detailed table cells matching exact forensic inspection
